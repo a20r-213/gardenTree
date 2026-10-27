@@ -1,0 +1,50 @@
+/* style.css — 見た目(色・大きさ・ならび)を決めるところ */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; min-height: 100%; background: #14101c; color: #efe6d2; }
+body {
+  font-family: 'DotGothic16', 'Hiragino Sans', 'Yu Gothic', 'Meiryo', sans-serif;
+  padding: env(safe-area-inset-top) 12px env(safe-area-inset-bottom);
+  display: flex; justify-content: center;
+}
+#app { width: min(100%, 420px); padding: 14px 0 22px; display: flex; flex-direction: column; gap: 12px; }
+
+header { display: flex; flex-direction: column; gap: 6px; }
+.row-between { display: flex; justify-content: space-between; align-items: baseline; }
+#title { font-size: 20px; letter-spacing: .12em; }
+#prog-label { font-size: 13px; color: #b9aecb; }
+#prog { height: 10px; border: 2px solid #3a2e4a; background: #0b0812; }
+#prog-fill { display: block; height: 100%; width: 0; background: repeating-linear-gradient(90deg, #7ed06a 0 6px, #5bb04a 6px 8px); }
+
+#stage {
+  position: relative; width: 100%; aspect-ratio: 3 / 4; background: #000;
+  border: 4px solid #3a2e4a; box-shadow: 0 0 0 2px #0b0812, 6px 6px 0 #0b0812;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+#stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+#fx { cursor: pointer; }
+#msg {
+  position: absolute; left: 0; right: 0; top: 10px; text-align: center; letter-spacing: .2em;
+  color: #fff6a0; text-shadow: 0 0 6px #000, 0 1px 0 #000; pointer-events: none; opacity: 0; font-size: 16px;
+}
+#msg.show { animation: flash 2.4s ease forwards; }
+@keyframes flash { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+
+#water { display: flex; align-items: center; gap: 14px; }
+#can-btn {
+  flex: none; padding: 6px 8px; background: #231a30; border: 2px solid #5a4a78; box-shadow: 3px 3px 0 #0b0812;
+  cursor: pointer; border-radius: 0; line-height: 0;
+}
+#can-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #0b0812; }
+#can { width: 132px; height: 108px; image-rendering: pixelated; }
+#wtext { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#pips { display: flex; gap: 6px; }
+#pips i { width: 22px; height: 22px; border: 2px solid #3a2e4a; background: #0b0812; }
+#pips i.on { background: #6cc3ff; border-color: #bfe7ff; }
+#wbar { height: 6px; border: 1px solid #3a2e4a; background: #0b0812; }
+#wbar-fill { display: block; height: 100%; width: 0; background: #6cc3ff; }
+#wlabel { font-size: 13px; color: #b9aecb; line-height: 1.5; }
+
+button.link { align-self: center; background: none; border: 0; color: #6f6483; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px; }
+#debug { font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px; border: 1px dashed #5a4a78; }
+#debug button { font: inherit; background: #2a2038; color: #efe6d2; border: 1px solid #5a4a78; padding: 4px 8px; cursor: pointer; }
+#debug[hidden] { display: none; }

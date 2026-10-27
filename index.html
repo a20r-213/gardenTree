@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14101c">
+<title>育つ木</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+  <header>
+    <div class="row-between">
+      <span id="title">育つ木</span>
+      <span id="prog-label"></span>
+    </div>
+    <div id="prog"><i id="prog-fill"></i></div>
+  </header>
+
+  <div id="stage">
+    <canvas id="tree"></canvas>
+    <canvas id="fx"></canvas>
+    <div id="msg"></div>
+  </div>
+
+  <section id="water">
+    <button id="can-btn" aria-label="じょうろで水をやる"><canvas id="can" width="22" height="18"></canvas></button>
+    <div id="wtext">
+      <div id="pips"><i></i><i></i><i></i></div>
+      <div id="wbar"><i id="wbar-fill"></i></div>
+      <div id="wlabel"></div>
+    </div>
+  </section>
+
+  <button id="reset" class="link">植え直す</button>
+
+  <div id="debug" hidden>
+    <b>デバッグ</b>
+    <button data-adv="4">+4時間</button>
+    <button data-adv="24">+1日</button>
+    <button data-adv="72">+3日</button>
+    <button id="dbg-water">水を満タン</button>
+  </div>
+</main>
+
+<!-- 木の絵(基本さわらない) → ゲームのしくみ(ここをよく直す) の順に読み込みます -->
+<script src="tree-art.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
