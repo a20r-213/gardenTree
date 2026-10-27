@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stream Overlay Maker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@600;700;900&family=Noto+Sans+JP:wght@400;500;700&family=Rajdhani:wght@600;700&display=swap');
+
+:root {
+  --ui-bg: #0a0f1d; --ui-panel: #111a2f; --ui-panel2: #17223b; --ui-line: #26334f;
+  --ui-text: #e6ebf5; --ui-sub: #8d99b3; --ui-acc: #5b9dff; --ui-or: #e8844a;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--ui-bg); color: var(--ui-text); font-family: 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif; font-size: 14px; }
+body.view { background: transparent; overflow: hidden; }
+body.view #app { display: none; }
+body:not(.view) #viewer { display: none; }
+
+/* =============== 部品の見た目(エディタ・OBS共通) =============== */
+.wc {
+  position: relative; width: 100%; height: 100%; overflow: hidden;
+  padding: calc(22px * var(--s) * var(--d)) calc(30px * var(--s) * var(--d));
+  background: var(--bgc); color: #eceef2; font-family: var(--ff);
+  border: 1px solid rgba(255, 255, 255, .07); border-radius: 4px;
+}
+.wc.inpanel { background: none; border-color: transparent; border-radius: 0; }
+.wc .meta { display: flex; justify-content: space-between; gap: 12px; font-family: var(--ffs); font-size: calc(13px * var(--s)); font-weight: 700; letter-spacing: .18em; color: #7c8594; margin-bottom: calc(12px * var(--s) * var(--d)); }
+.wc .ttl { margin: 0 0 calc(14px * var(--s) * var(--d)); font-size: calc(30px * var(--s)); line-height: 1.15; font-weight: 900; color: #f4ecd8; padding-bottom: calc(6px * var(--s)); border-bottom: 3px solid transparent; display: inline-block; }
+.wc .ttl.ul { border-bottom-color: #f4ecd8; }
+.wc .main { margin: 0 0 calc(10px * var(--s) * var(--d)); font-size: calc(26px * var(--s)); font-weight: 900; line-height: 1.35; color: #fff; word-break: break-word; }
+.wc .main.done { color: #6b7079; text-decoration: line-through; text-decoration-thickness: 2px; }
+.wc .nt { margin: 0 0 calc(12px * var(--s) * var(--d)); padding-left: calc(14px * var(--s)); border-left: 3px solid var(--accent); font-size: calc(16px * var(--s)); font-weight: 600; line-height: 1.7; color: #c8ccd4; white-space: pre-wrap; word-break: break-word; }
+.wc .subs { list-style: none; margin: calc(4px * var(--s)) 0 0; padding: 0; }
+.wc .sub { position: relative; padding-left: calc(28px * var(--s)); margin-bottom: calc(10px * var(--s) * var(--d)); font-size: calc(18px * var(--s)); font-weight: 600; line-height: 1.45; color: #d4d7dd; word-break: break-word; }
+.wc .sub:last-child { margin-bottom: 0; }
+.wc .sub .bx { position: absolute; left: 0; top: calc(5px * var(--s)); width: calc(14px * var(--s)); height: calc(14px * var(--s)); border: 1px solid #777; }
+.wc .sub.next .bx { border-color: var(--accent); }
+.wc .sub.dm { color: #868b95; }
+.wc .sub.done { color: #6b7079; text-decoration: line-through; text-decoration-thickness: 2px; }
+.wc .sub.done .bx { background: var(--accent); border-color: var(--accent); }
+.wc .bar { height: 2px; background: rgba(255, 255, 255, .1); margin-top: calc(18px * var(--s) * var(--d)); }
+.wc .bar i { display: block; height: 100%; background: var(--accent); }
+.wc .all { padding: calc(10px * var(--s)) 0; text-align: center; font-family: var(--ffs); font-weight: 700; letter-spacing: .3em; color: var(--accent); font-size: calc(20px * var(--s)); }
+.wc .empty { color: #868b95; padding: 8px 0; }
+.wc .flash { position: absolute; top: calc(10px * var(--s)); right: calc(18px * var(--s)); font-family: var(--ffs); font-size: calc(12px * var(--s)); font-weight: 700; letter-spacing: .3em; color: var(--accent); opacity: 0; animation: flash 1.3s ease forwards; }
+@keyframes flash { 0% { opacity: 0; transform: translateY(4px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; } }
+.wc .enter { animation: enter .4s ease both; }
+@keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* タスクメモ: 横長 */
+.wc.lay-bar { padding: calc(12px * var(--s) * var(--d)) calc(22px * var(--s) * var(--d)); }
+.wc.lay-bar .in { display: flex; align-items: center; gap: calc(26px * var(--s)); height: 100%; }
+.wc.lay-bar .bl { flex: 0 1 44%; min-width: 0; }
+.wc.lay-bar .bl.solo { flex: 1; }
+.wc.lay-bar .meta { margin-bottom: calc(6px * var(--s)); }
+.wc.lay-bar .main { font-size: calc(24px * var(--s)); margin: 0; }
+.wc.lay-bar .nt { margin: calc(6px * var(--s)) 0 0; padding-left: calc(10px * var(--s)); font-size: calc(14px * var(--s)); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.wc.lay-bar .br { flex: 1; min-width: 0; display: grid; grid-template-rows: repeat(var(--rows, 2), auto); grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: calc(4px * var(--s)) calc(22px * var(--s)); align-content: center; }
+.wc.lay-bar .sub { font-size: calc(16px * var(--s)); margin: 0; padding-left: calc(24px * var(--s)); }
+.wc.lay-bar .sub .bx { top: calc(4px * var(--s)); }
+.wc.lay-bar .all { flex: 1; }
+.wc.lay-bar .bar { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; }
+
+/* 探しもの・カウンター */
+.wc .lt { font-family: var(--ffs); font-size: calc(13px * var(--s)); font-weight: 700; letter-spacing: .16em; color: #7c8594; margin-bottom: calc(10px * var(--s) * var(--d)); }
+.wc .ls { list-style: none; margin: 0; padding: 0; }
+.wc .li { display: flex; align-items: flex-start; gap: calc(10px * var(--s)); padding: calc(7px * var(--s)) 0; border-bottom: 1px solid rgba(255, 255, 255, .05); cursor: pointer; font-size: calc(17px * var(--s)); font-weight: 600; line-height: 1.4; }
+.wc .li .bx { flex: none; position: relative; top: calc(4px * var(--s)); width: calc(14px * var(--s)); height: calc(14px * var(--s)); border: 1px solid #777; }
+.wc .li .lx { flex: 1; min-width: 0; word-break: break-word; color: #d4d7dd; }
+.wc .li .lc { flex: none; font-family: var(--ffs); font-weight: 700; color: var(--accent); font-size: calc(16px * var(--s)); white-space: nowrap; }
+.wc .li.done .lx { color: #6b7079; text-decoration: line-through; text-decoration-thickness: 2px; }
+.wc .li.done .bx { background: var(--accent); border-color: var(--accent); }
+.wc .li.done .lc { color: #6b7079; }
+
+/* アイテム画像(タイル) */
+.wc.t-grid { padding: calc(14px * var(--s) * var(--d)) calc(12px * var(--s) * var(--d)); }
+.wc .gs { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: calc(8px * var(--s)); }
+.wc .gt { position: relative; aspect-ratio: 1; border: 1px solid rgba(255, 255, 255, .1); background: rgba(255, 255, 255, .035); cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.wc .gt img { max-width: 84%; max-height: 84%; object-fit: contain; filter: grayscale(.8) brightness(.7); opacity: .65; transition: filter .3s, opacity .3s; }
+.wc .gt .nm { padding: 4px; text-align: center; font-size: calc(13px * var(--s)); font-weight: 700; color: #9aa0ab; word-break: break-all; line-height: 1.3; }
+.wc .gt .gn { position: absolute; left: 0; right: 0; bottom: 0; padding: calc(10px * var(--s)) calc(4px * var(--s)) calc(2px * var(--s)); background: linear-gradient(transparent, rgba(0, 0, 0, .8)); font-size: calc(11px * var(--s)); font-weight: 700; color: #d4d7dd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.wc .gt .gc { position: absolute; right: calc(4px * var(--s)); top: calc(2px * var(--s)); font-family: var(--ffs); font-weight: 700; font-size: calc(13px * var(--s)); color: var(--accent); text-shadow: 0 0 4px #000, 0 0 2px #000; }
+.wc .gt.done { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.wc .gt.done img { filter: none; opacity: 1; }
+.wc .gt.done .nm { color: #fff; }
+.wc .gt.done .gc::before { content: '✓ '; }
+.wc .gt.fx::after { content: ''; position: absolute; left: -10%; right: -10%; top: 0; height: 2px; background: linear-gradient(90deg, transparent, #fff 30%, #fff 70%, transparent); box-shadow: 0 0 10px 3px var(--accent), 0 0 22px 6px var(--accent); animation: beam .6s ease-out forwards; pointer-events: none; }
+.wc .gt.fx { animation: gflash .8s ease-out; }
+@keyframes beam { 0% { top: 0; opacity: 1; } 100% { top: 100%; opacity: 0; } }
+@keyframes gflash { 0% { box-shadow: inset 0 0 0 2px #fff, inset 0 0 18px var(--accent); } 100% { box-shadow: inset 0 0 0 0 transparent; } }
+.wc.t-grid .lt { margin-bottom: calc(8px * var(--s)); }
+.wc img { pointer-events: none; -webkit-user-drag: none; user-select: none; }
+/* 画像 */
+.wc.t-image { padding: 0; background: none; border: 0; border-radius: 0; }
+.wc.t-image .in { height: 100%; box-sizing: border-box; }
+.wc .pimg { display: block; width: 100%; height: 100%; }
+
+/* 育つ木 */
+.wc.t-plant { padding: 0; background: none; border: 0; border-radius: 0; }
+.wc.t-plant .in { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }
+.wc .pl { display: block; cursor: pointer; }
+.wc .plmsg { position: absolute; left: 0; right: 0; top: calc(10px * var(--s)); text-align: center; font-family: var(--ffs); font-weight: 700; font-size: calc(16px * var(--s)); letter-spacing: .2em; color: #fff6a0; text-shadow: 0 0 6px #000, 0 1px 0 #000; opacity: 0; animation: flash 2.4s ease forwards; pointer-events: none; }
+
+/* 時計・テキスト */
+.wc.t-clock .in, .wc.t-text .in { height: 100%; display: flex; flex-direction: column; justify-content: center; }
+.wc.t-clock .in { align-items: center; }
+.wc .ck { font-family: var(--ffs); font-weight: 700; font-size: calc(46px * var(--s)); letter-spacing: .04em; line-height: 1.1; color: #fff; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wc .cd { font-family: var(--ffs); font-size: calc(14px * var(--s)); letter-spacing: .14em; color: #7c8594; margin: calc(4px * var(--s)) 0; }
+.wc .tb { font-size: calc(var(--fs, 24px) * var(--s)); line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+
+/* =============== OBS用ビュー =============== */
+#vwrap { position: absolute; left: 0; top: 0; }
+#vctl { position: fixed; top: 4px; right: 6px; display: flex; gap: 6px; opacity: 0; transition: opacity .25s; z-index: 5; }
+body:hover #vctl { opacity: 1; }
+#vctl button { background: rgba(20, 20, 20, .9); color: #bbb; border: 1px solid #555; padding: 3px 9px; cursor: pointer; font-size: 12px; }
+#vf { position: absolute; left: 0; top: 0; }
+
+/* =============== エディタ =============== */
+#app { display: grid; grid-template-columns: minmax(340px, 430px) minmax(0, 1fr); gap: 16px; padding: 16px; align-items: start; max-width: 1560px; margin: 0 auto; }
+@media (max-width: 960px) { #app { grid-template-columns: 1fr; } }
+.panel { background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 14px; padding: 14px; }
+.panel + .panel { margin-top: 16px; }
+h2 { font-size: 13px; margin: 0 0 10px; color: var(--ui-sub); font-weight: 700; letter-spacing: .06em; }
+.appttl { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.appttl small { color: var(--ui-sub); font-weight: 500; margin-left: 8px; font-size: 12px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.tab { flex: 1; background: var(--ui-panel2); color: var(--ui-sub); border: 1px solid var(--ui-line); border-radius: 10px; padding: 9px 0; cursor: pointer; font: inherit; font-weight: 700; }
+.tab.on { color: #fff; border-color: var(--ui-acc); background: #1b2c4f; }
+.pane { display: none; }
+.pane.on { display: block; }
+label.f { display: block; margin: 10px 0 4px; font-size: 12px; color: var(--ui-sub); }
+input[type=text], input:not([type]), input[type=number], textarea, select { width: 100%; background: #0d1426; color: var(--ui-text); border: 1px solid var(--ui-line); border-radius: 8px; padding: 8px 10px; font: inherit; }
+textarea { resize: vertical; }
+input:focus, textarea:focus, select:focus { outline: 1px solid var(--ui-acc); }
+input[type=color] { width: 100%; height: 34px; padding: 2px; background: #0d1426; border: 1px solid var(--ui-line); border-radius: 8px; cursor: pointer; }
+input[type=range] { width: 100%; accent-color: var(--ui-acc); }
+.btn { background: var(--ui-panel2); color: var(--ui-text); border: 1px solid var(--ui-line); border-radius: 10px; padding: 9px 14px; cursor: pointer; font: inherit; font-weight: 700; }
+.btn:hover { border-color: var(--ui-acc); }
+.btn.pri { background: linear-gradient(180deg, #4a82d8, #3a68b4); border-color: #4a82d8; }
+.btn.or { background: linear-gradient(180deg, #f0904f, #d4703a); border-color: #f0904f; color: #fff; }
+.btn.wide { width: 100%; }
+.btn.sm { padding: 6px 10px; font-size: 12px; font-weight: 500; }
+.mini { background: #0d1426; color: var(--ui-sub); border: 1px solid var(--ui-line); border-radius: 6px; padding: 4px 8px; cursor: pointer; font: inherit; font-size: 12px; flex: none; }
+.mini:hover { color: #fff; border-color: var(--ui-acc); }
+.row { display: flex; gap: 8px; align-items: center; }
+.sec { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ui-line); }
+.g4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.g4 label { font-size: 11px; color: var(--ui-sub); display: block; }
+.g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.icard { background: var(--ui-panel2); border: 1px solid var(--ui-line); border-radius: 10px; padding: 10px; margin-bottom: 10px; display: grid; gap: 8px; }
+.icard.on { border-color: var(--ui-acc); box-shadow: 0 0 0 1px var(--ui-acc) inset; }
+.icard .irow { display: flex; gap: 6px; align-items: center; }
+.icard .num { color: var(--ui-sub); font-size: 12px; width: 18px; text-align: center; flex: none; }
+.icard .irow input[data-k=text] { flex: 1; min-width: 0; font-weight: 700; }
+.icard .irow select { width: auto; flex: 1; min-width: 0; }
+.icard .irow label { font-size: 12px; color: var(--ui-sub); display: flex; align-items: center; gap: 4px; flex: none; }
+.icard .irow label input { width: 64px; padding: 6px 8px; }
+.icard .subrow { display: flex; gap: 6px; align-items: center; padding-left: 24px; }
+.icard .subrow::before { content: '└'; color: var(--ui-sub); font-size: 12px; margin-left: -2px; }
+.chk { display: flex; align-items: center; gap: 8px; margin: 10px 0 0; font-size: 13px; cursor: pointer; }
+.chk input { accent-color: var(--ui-acc); width: 16px; height: 16px; }
+.slider { margin-top: 10px; font-size: 12px; color: var(--ui-sub); }
+.slider b { color: var(--ui-text); font-weight: 500; margin-left: 6px; }
+.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--ui-acc); font-size: 13px; }
+.help { color: var(--ui-sub); font-size: 12px; line-height: 1.7; }
+.help b, .help code { color: var(--ui-text); font-weight: 500; }
+.help ol { margin: 6px 0 0; padding-left: 18px; }
+.seg { display: flex; border: 1px solid var(--ui-line); border-radius: 8px; overflow: hidden; flex: none; }
+.seg button { background: #0d1426; color: var(--ui-sub); border: 0; padding: 6px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+.seg button.on { background: #1b2c4f; color: #fff; }
+
+/* 部品リスト */
+.wrow { display: flex; gap: 6px; align-items: center; padding: 8px 10px; margin-bottom: 6px; background: var(--ui-panel2); border: 1px solid var(--ui-line); border-radius: 10px; cursor: pointer; }
+.wrow.on { border-color: var(--ui-acc); box-shadow: 0 0 0 1px var(--ui-acc) inset; }
+.wrow .wn { flex: 1; min-width: 0; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wrow .wt { font-size: 11px; color: var(--ui-sub); flex: none; }
+
+/* 画面全体のプレビュー */
+#cvbox { position: relative; width: 100%; overflow: hidden; border-radius: 10px; border: 1px solid var(--ui-line); background: #000; }
+#cv { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; user-select: none; background: linear-gradient(135deg, #2f3d2c, #4a5a3d 45%, #232b22); }
+#fc { position: absolute; left: 0; top: 0; pointer-events: none; }
+.wbox, .gbox { position: absolute; }
+.gbox { outline: 2px dashed transparent; cursor: move; }
+.gbox .gtag { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: rgba(255, 255, 255, .55); font-size: 44px; text-align: center; line-height: 1.5; pointer-events: none; }
+.gbox.sel { outline-color: #5b9dff; }
+.wbox { cursor: move; }
+.wbox.sel { outline: 3px solid #5b9dff; outline-offset: 2px; z-index: 3; }
+.wbox.over { outline: 3px dashed #ff6b5e; outline-offset: 2px; }
+.wbox .wtag { display: none; position: absolute; left: 0; top: -34px; background: #5b9dff; color: #fff; font-size: 22px; padding: 2px 12px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+.wbox.sel .wtag { display: block; }
+.rh { display: none; position: absolute; right: -14px; bottom: -14px; width: 28px; height: 28px; background: #5b9dff; border: 3px solid #fff; border-radius: 50%; cursor: nwse-resize; z-index: 5; }
+.sel > .rh { display: block; }
+.outrow { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--ui-line); }
+.outrow .on1 { flex: 1; min-width: 0; }
+.outrow .on1 b { display: block; }
+.outrow .on1 span { font-size: 12px; color: var(--ui-sub); }
+#msg { height: 18px; font-size: 12px; color: #7fd99a; margin-top: 8px; }
+#overmsg { color: #ff8f84; font-size: 12px; margin-top: 8px; }
+.tcnt { color: var(--ui-sub); font-size: 13px; min-width: 120px; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- ===== OBS用ビュー(#w=… / #f=… が付いたURLで表示) ===== -->
+<div id="viewer">
+  <div id="vctl" hidden><button id="vprev">◀</button><button id="vnext">▶</button></div>
+  <div id="vwrap"></div>
+</div>
+
+<!-- ===== エディタ ===== -->
+<div id="app">
+  <div>
+    <div class="panel">
+      <div class="appttl">Stream Overlay Maker<small>配信画面の部品メーカー</small></div>
+      <div class="tabs">
+        <button class="tab on" data-tab="parts">部品</button>
+        <button class="tab" data-tab="layout">配置</button>
+        <button class="tab" data-tab="design">デザイン</button>
+      </div>
+
+      <div class="pane on" id="pane-parts">
+        <div id="wlist"></div>
+        <div class="row" style="margin-top:8px">
+          <select id="addtype"></select>
+          <button class="btn pri" id="addw" style="flex:none">＋ 部品を追加</button>
+        </div>
+        <div id="wed"></div>
+      </div>
+
+      <div class="pane" id="pane-layout">
+        <h2>テンプレート(部品が入れ替わります)</h2>
+        <div class="presets">
+          <button class="btn" data-tpl="A">A案(ゲーム大)</button>
+          <button class="btn" data-tpl="B">B案(バランス)</button>
+          <button class="btn" data-tpl="blank">空から</button>
+        </div>
+        <h2 style="margin-top:18px">ゲーム画面の場所</h2>
+        <p class="help" style="margin:0 0 8px">プレビューの点線の枠をドラッグしても動かせます。高さは16:9で自動に決まります。</p>
+        <div class="g3">
+          <div><label class="f" style="margin-top:0">X</label><input type="number" data-g="x"></div>
+          <div><label class="f" style="margin-top:0">Y</label><input type="number" data-g="y"></div>
+          <div><label class="f" style="margin-top:0">幅</label><input type="number" data-g="w"></div>
+        </div>
+        <p class="help" id="ginfo" style="margin-top:8px"></p>
+      </div>
+
+      <div class="pane" id="pane-design">
+        <h2>テンプレート</h2>
+        <div class="presets">
+          <button class="btn" data-theme="memo">明朝・紺</button>
+          <button class="btn" data-theme="term">タルコフ端末</button>
+          <button class="btn" data-theme="clean">ミニマル</button>
+        </div>
+        <label class="f" for="t-font">フォント</label>
+        <select id="t-font" data-th="font">
+          <option value="serif">明朝(Noto Serif JP)</option>
+          <option value="gothic">ゴシック(Noto Sans JP)</option>
+          <option value="tech">Rajdhani + ゴシック</option>
+        </select>
+        <div class="g3" style="margin-top:12px">
+          <div><label class="f" style="margin-top:0">アクセント色</label><input type="color" data-th="accent"></div>
+          <div><label class="f" style="margin-top:0">部品の背景色</label><input type="color" data-th="bg"></div>
+          <div><label class="f" style="margin-top:0">外枠の背景色</label><input type="color" data-th="frameBg"></div>
+        </div>
+        <div class="slider">部品の背景の濃さ<b data-thout="alpha"></b><input type="range" min="0" max="100" data-th="alpha"></div>
+        <p class="help" style="margin-top:10px">色や文字の種類は、すべての部品と外枠に共通で使われます。</p>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>画面全体(1920 × 1080)</h2>
+      <div id="cvbox">
+        <div id="cv">
+          <canvas id="fc" width="1920" height="1080"></canvas>
+          <div class="gbox" id="gbox" data-id="game"><div class="gtag">GAME</div><div class="rh"></div></div>
+        </div>
+      </div>
+      <p class="help" style="margin:8px 0 0">部品はドラッグで動かして、右下の丸でサイズを変えられます。赤い点線は、中身が枠からはみ出している印です。</p>
+    </div>
+
+    <div class="panel">
+      <h2>書き出し(OBSに入れるもの)</h2>
+      <div id="outs"></div>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap">
+        <button class="btn" id="save-json">設定をファイルに保存</button>
+        <button class="btn" id="load-json">設定を読み込む</button>
+        <input type="file" id="file" accept=".json,application/json" hidden>
+      </div>
+      <div id="msg"></div>
+      <details>
+        <summary>OBSでの使い方</summary>
+        <div class="help">
+          <ol>
+            <li>ゲームキャプチャを、上に出ている「拡大率」と位置に合わせて置く</li>
+            <li>その上に「外枠」を置く(リンクのブラウザソース、またはPNG画像)。ゲーム画面の部分は透明です</li>
+            <li>各部品は、「リンクをコピー」したものをブラウザソースのURL欄に貼る。<b>「ローカルファイル」のチェックは外します</b></li>
+            <li>幅・高さ・位置は、一覧に出ている数字を入れる(背景は透明になります)</li>
+            <li>タスクメモは、ソースを右クリック → 「対話」で <b>→ / ←</b> キー。探しものは対話画面でクリック(右クリックで減らす)</li>
+          </ol>
+          <p>内容や配置を変えたら、変えた部品のリンクをコピーし直してURL欄を入れ替えてください。リンクにはこのファイルの場所が入っているので、ファイルを動かしたり名前を変えたりしたら作り直しです。進み具合や個数はOBSのブラウザ内に保存されます。</p>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel" id="rmpanel">
+      <h2>Stream Deck などから操作する</h2>
+      <p class="help" style="margin:0 0 8px">ボタン1つで「水やり」「タスクを進める」「アイテム+1」ができるようになります。小さな中継ツール(リレー)を、配信中だけパソコンで動かします。</p>
+      <label class="chk"><input type="checkbox" id="rm-on">この機能を使う(オンにしたら、部品のリンクを貼り直します)</label>
+      <div class="row" style="margin-top:8px"><span class="help" style="flex:1">ポート番号(ふつうは変えなくてOK)</span><input type="number" id="rm-port" min="1024" max="65535" style="width:110px"></div>
+      <div class="row" style="margin-top:10px;flex-wrap:wrap"><button class="btn" id="rm-dl">リレーを保存(overlay-relay.js)</button><button class="btn" id="rm-bat">起動用のファイルを保存(.bat)</button></div>
+      <div id="rm-cmds" style="margin-top:12px"></div>
+      <details>
+        <summary>設定のしかた</summary>
+        <div class="help">
+          <ol>
+            <li>「リレーを保存」で <b>overlay-relay.js</b> を、好きなフォルダに保存します(Node.jsが入っている必要があります)。</li>
+            <li>そのフォルダで、ターミナルから <code>node overlay-relay.js</code> を実行します。「起動しました」と出れば成功です。配信中は、この画面を開いたままにします。(.bat を同じフォルダに置けば、ダブルクリックで起動できます)</li>
+            <li>上の「この機能を使う」をオンにして、操作したい部品のリンクを、OBSに貼り直します。</li>
+            <li>Stream Deck に「Webサイト」のアクションを置き、URL欄に下の一覧の「URLをコピー」で出したものを貼ります。<b>「バックグラウンドでアクセス」にチェック</b>を入れると、ブラウザが開きません。</li>
+          </ol>
+          <p>リレーはこのパソコンの中(127.0.0.1)だけで動き、外からはつながりません。部品の名前で絞りたいときは、一覧のURLの <code>?part=</code> 以降がその部品の名前です(名前を変えたらURLも取り直してください)。</p>
+        </div>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script type="text/plain" id="relay-src">// Stream Overlay Maker 用 リレー(Stream Deck などから操作するための小さな中継ツール)
+// 使い方: このファイルのあるフォルダで  node overlay-relay.js  を実行(Node.jsが必要)。止めるときは Ctrl+C。
+// 他のポートを使うとき: node overlay-relay.js 4600
+// 自分のパソコンの中(127.0.0.1)だけで動きます。外のネットワークには公開されません。
+'use strict';
+const http = require('http');
+const PORT = parseInt(process.argv[2] || process.env.PORT || '4580', 10);
+const ALLOWED = new Set(['water', 'unwater', 'next', 'prev', 'item']);
+let seq = 0, cmds = [];
+
+const send = (res, code, body, type) => {
+  res.writeHead(code, { 'Content-Type': type || 'application/json; charset=utf-8', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Cache-Control': 'no-store' });
+  res.end(body);
+};
+
+const helpPage = () => `<!doctype html><meta charset="utf-8"><title>Overlay Relay</title>
+<body style="font:15px/1.7 sans-serif;max-width:720px;margin:30px auto;padding:0 16px">
+<h2>Overlay Relay は動いています(ポート ${PORT})</h2>
+<p>Stream Deck の「Webサイト」アクション(バックグラウンドでアクセス)などに、次のURLを入れて使います。</p>
+<ul>
+<li>水やり: <code>http://127.0.0.1:${PORT}/cmd/water</code></li>
+<li>水やりを1つ戻す: <code>http://127.0.0.1:${PORT}/cmd/unwater</code></li>
+<li>タスクを進める: <code>http://127.0.0.1:${PORT}/cmd/next</code></li>
+<li>タスクを戻す: <code>http://127.0.0.1:${PORT}/cmd/prev</code></li>
+<li>探しものの1番目を+1: <code>http://127.0.0.1:${PORT}/cmd/item/1</code>(−1は <code>/cmd/item/1/minus</code>)</li>
+</ul>
+<p>部品の名前で絞るときは、最後に <code>?part=部品の名前</code> を付けます。</p>`;
+
+http.createServer((req, res) => {
+  let u;
+  try { u = new URL(req.url, 'http://127.0.0.1'); } catch (e) { return send(res, 400, '{"ok":false}'); }
+  if (req.method === 'OPTIONS') return send(res, 204, '');
+  if (u.pathname === '/poll') {
+    const since = parseInt(u.searchParams.get('since'), 10);
+    const out = Number.isFinite(since) && since >= 0 ? cmds.filter(c => c.id > since) : [];
+    return send(res, 200, JSON.stringify({ last: seq, cmds: out }));
+  }
+  if (u.pathname.startsWith('/cmd/')) {
+    const seg = u.pathname.slice(5).split('/').map(s => { try { return decodeURIComponent(s); } catch (e) { return ''; } });
+    if (!ALLOWED.has(seg[0])) return send(res, 404, '{"ok":false,"error":"unknown command"}');
+    const c = { id: ++seq, cmd: seg[0], arg: String(seg[1] || '').slice(0, 20), minus: seg[2] === 'minus', part: String(u.searchParams.get('part') || '').slice(0, 60) };
+    cmds.push(c); if (cmds.length > 200) cmds.shift();
+    console.log(new Date().toLocaleTimeString(), c.cmd, c.arg || '', c.minus ? '(-1)' : '', c.part ? '[' + c.part + ']' : '');
+    return send(res, 200, JSON.stringify({ ok: true, id: c.id }));
+  }
+  if (u.pathname === '/') return send(res, 200, helpPage(), 'text/html; charset=utf-8');
+  send(res, 404, '{"ok":false}');
+}).on('error', e => {
+  console.error(e.code === 'EADDRINUSE' ? `ポート ${PORT} はすでに使われています。リレーがもう起動しているか、別のポート(例: node overlay-relay.js 4600)を使ってください。` : e.message);
+  process.exit(1);
+}).listen(PORT, '127.0.0.1', () => {
+  console.log(`Overlay Relay を起動しました: http://127.0.0.1:${PORT}/  (止めるには Ctrl+C)`);
+});
+</script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+const KEY = 'tmm_state_v3';
+const W = 1920, H = 1080;
+const SANS = "'Noto Sans JP','Yu Gothic','Meiryo',sans-serif";
+const FONTS = {
+  serif:  "'Noto Serif JP','Yu Mincho','Hiragino Mincho ProN','Source Han Serif JP',serif",
+  gothic: SANS,
+  tech:   "'Rajdhani','Noto Sans JP','Yu Gothic','Meiryo',sans-serif"
+};
+const DENS = { loose: 1.15, normal: 1, tight: .6 };
+const THEMES = {
+  memo:  { font: 'serif',  accent: '#b8923f', bg: '#15171d', alpha: 94, frameBg: '#10131a' },
+  term:  { font: 'tech',   accent: '#c79a54', bg: '#0c0c0c', alpha: 86, frameBg: '#0a0a0a' },
+  clean: { font: 'gothic', accent: '#8ab4ff', bg: '#111111', alpha: 80, frameBg: '#0d0f14' }
+};
+const TYPE_NAMES = { task: 'タスクメモ', list: '探しもの・カウンター', grid: 'アイテム画像(タイル)', clock: '時計', text: 'テキスト', image: '画像', plant: '育つ木(ドット絵)' };
+const okImg = v => typeof v === 'string' && v.length < 600000 && (/^data:image\/(png|webp|jpeg|gif);base64,[A-Za-z0-9+\/=]+$/.test(v) || /^https?:\/\/[^\s"'<>]+$/.test(v));
+let FX = null;
+const setFx = (id, i) => { FX = { id, i }; setTimeout(() => { if (FX && FX.id === id && FX.i === i) FX = null; }, 1200); };
+
+/* ---------- 汎用 ---------- */
+const str = (v, d) => typeof v === 'string' ? v : d;
+const hex = (v, d) => /^#[0-9a-f]{6}$/i.test(v) ? v : d;
+const num = (v, d, a, b) => v !== null && v !== '' && v !== undefined && Number.isFinite(+v) ? clamp(+v, a, b) : d;
+const bool = (v, d) => typeof v === 'boolean' ? v : d;
+const pick = (v, list, d) => list.includes(v) ? v : d;
+const uid = () => 'w' + Math.random().toString(36).slice(2, 8);
+function rgba(h, a) { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a / 100})`; }
+function shade(h, pct) {
+  const n = parseInt(h.slice(1), 16), t = Math.abs(pct) / 100, f = pct < 0 ? 0 : 255;
+  const m = c => Math.round(c + (f - c) * t);
+  return `rgb(${m(n >> 16)},${m((n >> 8) & 255)},${m(n & 255)})`;
+}
+const enc = o => {
+  const b = new TextEncoder().encode(JSON.stringify(o)); let s = '';
+  for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const dec = t => {
+  t = t.replace(/-/g, '+').replace(/_/g, '/'); while (t.length % 4) t += '=';
+  const s = atob(t), b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(b));
+};
+const hash = t => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+
+/* ============================================================
+   タスクメモの進み方
+   進捗は「消化したステップ数 p」ひとつ。ステップ = サブタスク1個、または
+   サブタスクのない項目1個。
+   ============================================================ */
+const steps = it => Math.max(1, it.subs.length);
+const taskTotal = items => items.reduce((a, i) => a + steps(i), 0);
+const taskStart = (items, idx) => items.slice(0, idx).reduce((a, i) => a + steps(i), 0);
+function taskLocate(items, p) {
+  let r = p;
+  for (let i = 0; i < items.length; i++) { const n = steps(items[i]); if (r < n) return { ti: i, si: r }; r -= n; }
+  return { ti: items.length, si: 0 };
+}
+function parseText(src) {
+  const out = []; let cur = null;
+  const mk = line => { const [name, ...rest] = line.split(/\s*[|｜]\s*/); return { text: name.trim(), note: rest.join(' ').trim(), subs: [] }; };
+  for (const raw of src.split(/\r?\n/)) {
+    const line = raw.trim(); if (!line) continue;
+    let m;
+    if ((m = line.match(/^\d+[.．)）]\s*(.*)$/))) { cur = mk(m[1]); out.push(cur); }
+    else if (cur && (m = line.match(/^[-・◦○]\s*(.*)$/))) cur.subs.push(m[1].trim());
+    else if (cur && (m = line.match(/^[>＞※]\s*(.*)$/))) cur.note = cur.note ? cur.note + '\n' + m[1].trim() : m[1].trim();
+    else { cur = mk(line.replace(/^[-・◦○]\s*/, '')); out.push(cur); }
+  }
+  return out.slice(0, 60);
+}
+const toText = items => items.map((it, i) =>
+  `${i + 1}. ${it.text}` +
+  (it.note ? '\n' + it.note.split('\n').map(l => '> ' + l).join('\n') : '') +
+  it.subs.map(s => '\n- ' + s).join('')).join('\n');
+
+/* ============================================================
+   ドット絵の植物
+   ============================================================ */
+const PAL = {
+  tree:   { name: '若葉の木', leaf: ['#1d4a2a', '#2f7d3e', '#58b04a', '#a6e870'], trunk: ['#3a2416', '#5b3a22', '#80573a'], fruit: '#e0463b', petals: false, bloom: null },
+  sakura: { name: '桜',       leaf: ['#7c2e55', '#c4567f', '#f08fb2', '#ffd6e4'], trunk: ['#38242f', '#573748', '#7b5367'], fruit: '#fff4f8', petals: true,  bloom: '#fff4f8' },
+  autumn: { name: '紅葉',     leaf: ['#6a230f', '#b5461a', '#e8862c', '#f7c95a'], trunk: ['#33211a', '#52382a', '#74523c'], fruit: '#ffe58f', petals: true,  bloom: null }
+};
+const PALX = { summer: { name: '夏', leaf: ['#123b1d', '#206a35', '#37a047', '#86d95c'], trunk: ['#3a2416', '#5b3a22', '#80573a'], fruit: '#e0463b', petals: false, bloom: null } };
+const SEASONS = ['春', '夏', '秋', '冬'];
+const SKY = {
+  day:    ['#5fb0e6', '#7cc2ee', '#9ad2f2', '#b9e0f6', '#d8f0fa'],
+  dawn:   ['#5d6fb0', '#8d85bd', '#d196b0', '#efb399', '#f8d6a6'],
+  sunset: ['#444a8c', '#85569a', '#d4647a', '#ee8c60', '#f7bd6a'],
+  night:  ['#080c26', '#0e1536', '#151f46', '#1b2856', '#243566']
+};
+const BAY = [0, 0.5, 0.75, 0.25];
+const PLFX = new Map();
+const plFx = id => { let a = PLFX.get(id); if (!a) { a = []; PLFX.set(id, a); } return a; };
+let PLMSG = null;
+const PLC = new Map();
+const rng = seed => { let a = parseInt(hash(String(seed)), 36) >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+const hsh = (x, y, k) => { let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(k | 0, 1013904223)) | 0; h = Math.imul(h ^ (h >>> 15), 2246822519); h = Math.imul(h ^ (h >>> 13), 3266489917); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const ease = x => x * x * (3 - 2 * x);
+const plSteps = p => Math.max(3, Math.round(p.steps) || 20);
+const plThr = (p, k) => Math.max(k + 1, Math.round(plSteps(p) * (0.15 + 0.85 * k / (DECOR.length - 1))));
+const plUnl = w => { if (!w.props.decor) return 0; let n = 0; for (let k = 0; k < DECOR.length; k++) if ((w.state.g | 0) >= plThr(w.props, k)) n++; return n; };
+function plSeasonIdx(w) { const p = w.props, g = w.state.g | 0, st = plSteps(p); return !p.seasons || g < st ? -1 : Math.floor((g - st) / Math.max(1, p.seasonLen)); }
+function plSeason(w) { const i = plSeasonIdx(w); return i < 0 ? -1 : i % 4; }
+function plInfo(w) {
+  const g = w.state.g | 0, st = plSteps(w.props), n = plUnl(w);
+  let t = `成長 ${g} / ${st}(${Math.min(100, Math.round(g / st * 100))}%)`;
+  const si = plSeasonIdx(w);
+  if (si >= 0) { const len = Math.max(1, w.props.seasonLen); t += ` ／ 季節: ${SEASONS[si % 4]}(あと${len - ((g - plSteps(w.props)) % len)}回で${SEASONS[(si + 1) % 4]})`; }
+  if (w.props.decor) t += ` ／ デコレーション・動物 ${n}/${DECOR.length}` + (n ? ':' + DECOR.slice(0, n).join('・') : '') + (n < DECOR.length ? ` ／ 次は「${DECOR[n]}」(${plThr(w.props, n)}回で解放)` : '');
+  return t;
+}
+function waterPlant(w, dir) {
+  const before = plUnl(w), sBefore = plSeasonIdx(w), fx = plFx(w.id), now = performance.now() / 1000;
+  w.state.g = clamp((w.state.g | 0) + (dir > 0 ? 1 : -1), 0, 9999);
+  if (dir > 0) {
+    for (let i = 0; i < 9; i++) fx.push({ k: 'drop', xf: 0.2 + Math.random() * 0.6, t0: now, dl: Math.random() * 0.35 });
+    fx.push({ k: 'burst', t0: now + 0.9 });
+    const after = plUnl(w), sAfter = plSeasonIdx(w);
+    if (sAfter > sBefore) PLMSG = { id: w.id, text: sAfter === 0 ? '満開!' : SEASONS[sAfter % 4], t: Date.now() };
+    else if (after > before) PLMSG = { id: w.id, text: 'NEW  ' + DECOR[after - 1], t: Date.now() };
+  }
+}
+function skyPhase(mode) {
+  if (mode !== 'auto') return mode;
+  const d = new Date(), h = d.getHours() + d.getMinutes() / 60;
+  return h >= 5 && h < 7 ? 'dawn' : h >= 7 && h < 16.5 ? 'day' : h >= 16.5 && h < 18.5 ? 'sunset' : 'night';
+}
+function plLayout(p, Lw, Lh) {
+  const key = [p.seed, p.species, Lw, Lh].join('|'); let L = PLC.get(key); if (L) return L;
+  const R = rng(key), gy = Lh - Math.max(6, Math.round(Lh * 0.05));
+  const cx = Math.round(Lw / 2 + (R() - .5) * Lw * 0.08), U = Math.max(12, Math.min(Lw, gy * 0.33)), Hc = Math.max(10, Math.min(gy * 0.34, U * 1.5)), TH = Math.max(4, Math.round(Math.min(gy * 0.26, U * 0.9)));
+  const J = () => (R() - .5) * .08;
+  const limbs = [{ t: .70, ex: -.27 + J(), ey: .30 + J() }, { t: .76, ex: .28 + J(), ey: .36 + J() }, { t: .88, ex: -.14 + J(), ey: .64 + J() }, { t: .92, ex: .15 + J(), ey: .70 + J() }, { t: 1.0, ex: J(), ey: 1.0 }];
+  const clumps = [
+    ...limbs.map((l, i) => ({ ex: l.ex, ey: l.ey, r: (i === 4 ? .19 : .17) + R() * .03 })),
+    { ex: 0, ey: .45, r: .22 }, { ex: -.30, ey: .52, r: .15 }, { ex: .30, ey: .56, r: .15 }, { ex: -.08, ey: .82, r: .17 }, { ex: .12, ey: .22, r: .16 }, { ex: -.12, ey: .2, r: .15 }
+  ].map(c => Object.assign(c, { ex: c.ex + (R() - .5) * .04, id: Math.floor(R() * 1000) }));
+  L = { gy, cx, U, Hc, TH, limbs, clumps, wob: R() * 6.28,
+    stars: Array.from({ length: 14 }, () => ({ x: Math.floor(R() * Lw), y: Math.floor(R() * gy * 0.6), ph: R() * 6.28 })),
+    clouds: Array.from({ length: 3 }, () => ({ y: Math.floor(gy * (0.05 + R() * 0.35)), x0: R() * (Lw + 14), sp: 0.5 + R() * 0.7 })),
+    decor: DECOR.map(() => ({ x: Math.floor(3 + R() * Math.max(1, Lw - 6)), c: Math.floor(R() * 3) })) };
+  if (PLC.size > 20) PLC.clear();
+  PLC.set(key, L); return L;
+}
+const NAMES = { flower: '花', mush: 'キノコ', stone: '石', bunny: 'うさぎ', fly: 'ちょうちょ', fence: '柵', squirrel: 'リス', lantern: 'ランタン', bird: '小鳥', owl: 'ふくろう', hedgehog: 'ハリネズミ', firefly: 'ほたる', fox: 'きつね', deer: 'しか', fruit: '実り' };
+const ORDER = Object.keys(NAMES);
+const DECOR = ORDER.map(k => NAMES[k]);
+const SPR = {
+  bunny: { c: { b: '#b69a82', p: '#f0a8b8', K: '#1b1b1b', n: '#e08aa0', w: '#ffffff', f: '#8a7260' }, r: ['......bp', '......bp', '....bbbb', '.bbbbbKb', 'wbbbbbbn', '.bbbbbb.', '.ff..ff.'] },
+  squirrel: { c: { t: '#d6823a', l: '#f2b878', b: '#a8541f', K: '#1b1b1b', n: '#3a2a2a', f: '#6b3a18' }, r: ['tt......', 'ttt..bb.', 'tlt.bbbb', 'ttbbbbKb', '.tbbbbbn', '..bbbbb.', '..bbbbb.', '..f..f..'] },
+  hedgehog: { c: { s: '#5a4636', S: '#8a6e52', b: '#e0c4a0', K: '#111111', n: '#222222', f: '#3a2c20' }, r: ['..sssss..', '.sSsSsSs.', 'sSsSsSsbb', 'ssssssbKn', '.f.f.f.f.'] },
+  fox: { c: { o: '#e07b2a', w: '#fff3e0', K: '#1b1b1b', n: '#2a1a12', f: '#4a2a14', d: '#b35a1a' }, r: ['........o.o.', '........ooo.', 'oo....ooooKo', 'ooow.oooooon', 'woooooooowww', '.dooooooooo.', '..f.f..f.f..'] },
+  deer: { c: { a: '#cdb89a', o: '#b07a45', O: '#8d5e32', K: '#1b1b1b', n: '#2a1a12', w: '#f3e6d0', f: '#5a3d22' }, r: ['......a.a..', '......aaa.a', '.......aaa.', '........oo.', '.......oKon', '......ooooo', '.....ooo...', '....oooo...', 'ww.ooooooo..', 'wooooooooo..', '.oooooooOo..', '.oooooooOo..', '.f.f...f.f..', '.f.f...f.f..'] },
+  owl: { c: { b: '#7a5c3e', w: '#fff3d6', K: '#1b1b1b', Y: '#ffd84a', y: '#ffb347', c: '#d8c3a0' }, r: ['bb...bb', 'bbbbbbb', 'bwwbwwb', 'bwKbKwb', 'bbbybbb', 'bcccccb', 'bcbcbcb', '.bcccb.', '..y.y..'] },
+  owlz: { c: { b: '#7a5c3e', w: '#fff3d6', K: '#1b1b1b', Y: '#ffd84a', y: '#ffb347', c: '#d8c3a0' }, r: ['bb...bb', 'bbbbbbb', 'bbbbbbb', 'bKKbKKb', 'bbbybbb', 'bcccccb', 'bcbcbcb', '.bcccb.', '..y.y..'] }
+};
+const PLV = new Map();
+function plVis(id, tg, ts, fade, now) {
+  let v = PLV.get(id); if (!v) { v = { g: tg, s: ts, t: now }; PLV.set(id, v); return v; }
+  const dt = Math.min(0.25, Math.max(0, now - v.t)); v.t = now;
+  v.g += (tg - v.g) * Math.min(1, dt * 1.1);
+  if (Math.abs(tg - v.g) < 0.003) v.g = tg;
+  if (ts < 0 || v.s < 0 || fade <= 0) v.s = ts;
+  else { const d = ts - v.s, stp = dt / fade * Math.max(1, Math.abs(d)); v.s = Math.abs(d) <= stp ? ts : v.s + Math.sign(d) * stp; }
+  return v;
+}
+function plSeasonState(sv) {
+  if (sv < 0) return { k: -1, tN: 0, mode: 'plain', snow: 0, twig: false, leaves: true };
+  const fl = Math.floor(sv + 1e-9), k = fl % 4, tN = Math.max(0, Math.min(1, sv - fl));
+  return { k, tN, mode: ['mix', 'mix', 'fall', 'bud'][k], snow: k === 2 ? Math.max(0, (tN - 0.5) * 2) : k === 3 ? 1 - tN : 0, twig: (k === 2 && tN > 0.02) || k === 3, leaves: !(k === 3 && tN <= 0) };
+}
+function plantFrame(ctx, w, Lw, Lh) {
+  const p = w.props, g = w.state.g | 0, steps = plSteps(p), now = performance.now() / 1000;
+  const tS = plSeasonIdx(w), vis = plVis(w.id, g, tS, Math.max(0, +p.fade), now), gv = vis.g, s = Math.min(1, gv / steps), ss = plSeasonState(vis.s), base = PAL[p.species] || PAL.tree;
+  const palOf = k => k === 1 ? PALX.summer : k === 2 ? PAL.autumn : base;
+  const palA = ss.k < 0 ? base : palOf(ss.k), palB = ss.k < 0 ? base : palOf((ss.k + 1) % 4);
+  const L = plLayout(p, Lw, Lh), gy = L.gy, cx = L.cx, snowy = ss.snow > 0.5;
+  const rect = (x, y, ww, hh, c, a) => { ctx.globalAlpha = a === undefined ? 1 : a; ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), ww, hh); ctx.globalAlpha = 1; };
+  const px = (x, y, c, a) => rect(x, y, 1, 1, c, a);
+  const disc = (x, y, r, c) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if (i * i + j * j <= r * r + 1) px(x + i, y + j, c); };
+  const u = key => p.decor && g >= plThr(p, ORDER.indexOf(key));
+  const D = key => L.decor[ORDER.indexOf(key)];
+  const away = x => Math.min(Lw - 3, Math.max(2, Math.abs(x - cx) < 5 ? x + (x >= cx ? 6 : -6) : x));
+  const sprite = (def, x0, baseY, flip, cmap) => { const rows = def.r, wd = rows[0].length, h = rows.length, cm = cmap || def.c; for (let j = 0; j < h; j++) for (let i = 0; i < wd; i++) { const ch = rows[j][flip ? wd - 1 - i : i]; if (ch !== '.' && cm[ch]) px(x0 + i - (wd >> 1), baseY - h + j, cm[ch]); } };
+  const wander = (idx, cycle, frac) => { const n = Math.floor(now / cycle), ph = (now % cycle) / cycle, sc = [0.18, 0.82, 0.5, 0.3, 0.7][idx - 1] * Lw, r = k => Math.min(Lw - 7, Math.max(6, sc + (hsh(k, idx, 23) - 0.5) * 2 * Lw * 0.3)), a = r(n - 1), b = r(n), mv = ph < frac; return { x: a + (b - a) * (mv ? ease(ph / frac) : 1), dir: b >= a ? 1 : -1, mv }; };
+  ctx.clearRect(0, 0, Lw, Lh);
+  const phase = p.sky === 'none' ? 'none' : skyPhase(p.sky), night = phase === 'night', dim = night || phase === 'dawn' || phase === 'sunset';
+  if (phase !== 'none') {
+    const bands = SKY[phase], bh = gy / bands.length;
+    bands.forEach((c, i) => rect(0, Math.floor(i * bh), Lw, Math.ceil(bh) + 1, c));
+    if (night) L.stars.forEach(st => px(st.x, st.y, '#ffffff', 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(now * 1.3 + st.ph))));
+    const sx = Math.round(Lw * (phase === 'dawn' ? 0.22 : 0.78)), sy = phase === 'sunset' || phase === 'dawn' ? Math.round(gy * 0.78) : Math.round(gy * 0.07) + 4;
+    if (night) { disc(sx, sy, 3, '#f4f1d0'); disc(sx + 2, sy - 1, 3, SKY.night[0]); }
+    else disc(sx, sy, 3, phase === 'day' ? '#fff2a8' : '#ffd27a');
+    if (!night) L.clouds.forEach(c => { const x = Math.round(((c.x0 + now * c.sp) % (Lw + 14)) - 7), cc = dim ? '#f3d9d0' : '#ffffff', sh = dim ? '#d9b5b0' : '#d5e6f3'; rect(x + 1, c.y, 4, 1, cc); rect(x, c.y + 1, 6, 1, cc); rect(x + 1, c.y + 2, 4, 1, sh); });
+  }
+  // 地面
+  const gH = Lh - gy;
+  rect(0, gy, Lw, gH, '#5a3d28'); rect(0, gy, Lw, 1, '#6dbb4e'); rect(0, gy + 1, Lw, 1, '#3f8a3a');
+  for (let x = 0; x < Lw; x++) {
+    for (let r = 2; r < gH; r++) { const v = hsh(x, r, 7); if (v < 0.12) px(x, gy + r, '#47301f'); else if (v < 0.22) px(x, gy + r, '#6e4a31'); }
+    if (ss.snow < 0.3 && hsh(x, 0, 5) < 0.16) px(x, gy - 1, '#4f9d3f');
+    if (ss.snow > 0 && hsh(x, 0, 15) < ss.snow * 1.15) { px(x, gy, '#f2f8ff'); px(x, gy + 1, hsh(x, 1, 16) < 0.5 ? '#f2f8ff' : '#cfe0f2'); if (ss.snow > 0.7 && hsh(x, 2, 17) < 0.5) px(x, gy - 1, '#f2f8ff'); }
+  }
+  // 地面のデコレーション
+  if (u('fence')) { const x0 = Math.min(2, Lw - 16), n = Math.min(14, Math.floor(Lw / 3)); rect(x0, gy - 2, n, 1, '#8a6238'); for (let i = 0; i <= n; i += 3) rect(x0 + i, gy - 4, 1, 4, '#b98a52'); if (snowy) rect(x0, gy - 3, n, 1, '#f2f8ff'); }
+  if (u('stone')) { const x = away(D('stone').x); rect(x, gy - 1, 3, 1, '#8a8f99'); px(x + 1, gy - 2, '#a9aeb8'); px(x + 2, gy - 1, '#5f646e'); if (snowy) px(x + 1, gy - 3, '#f2f8ff'); }
+  if (u('mush')) { const x = away(D('mush').x); rect(x - 1, gy - 3, 3, 1, '#d94a3d'); rect(x - 2, gy - 2, 5, 1, '#d94a3d'); px(x, gy - 3, '#fff'); px(x + 1, gy - 2, '#fff'); px(x, gy - 1, '#f2e8d5'); }
+  if (u('flower') && ss.snow < 0.5) {
+    const FL = ['#ff8fb1', '#ffe066', '#ffffff', '#b79bff'], d = D('flower');
+    [0, 4, 9].forEach((o, i) => { const x = away(d.x + o), h = 2 + (i % 2), c = FL[(d.c + i) % 4]; for (let j = 0; j < h; j++) px(x, gy - 1 - j, '#3c8f3a'); const y = gy - 1 - h; px(x - 1, y, c); px(x + 1, y, c); px(x, y - 1, c); px(x, y, '#fff6a0'); });
+  }
+  // 木
+  let ccx = cx, ccy = gy - 4, top = null, cls = null, cAmt = 0;
+  const colTop = new Array(Lw).fill(1e9);
+  if (g <= 0 && gv < 0.05) { rect(cx - 1, gy - 1, 2, 1, '#5b3a22'); px(cx - 1, gy - 1, '#80573a'); }
+  else {
+    const U = L.U, Hc = L.Hc, T = base.trunk;
+    const sg = ease(Math.min(1, s / 0.8)), th = Math.round(2 + (L.TH - 2) * sg), c = ease(Math.max(0, Math.min(1, (s - 0.06) / 0.94)));
+    const sway = Math.sin(now * 0.9) * 0.6 + Math.sin(now * 0.37) * 0.5;
+    const tx = y => cx + Math.round(Math.sin(y * 0.1 + L.wob) * 1.0);
+    const line = (x0, y0, x1, y1, thick, col) => { const n = Math.max(1, Math.round(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)))); for (let k = 0; k <= n; k++) { const x = x0 + (x1 - x0) * k / n, y = y0 + (y1 - y0) * k / n; px(x, y, col); if (thick && k < n * 0.6) px(x + 1, y, col); } };
+    const wb = Math.max(3, Math.min(7, Math.round(U * 0.075))) * (0.4 + 0.6 * sg);
+    for (let i = 0; i < th; i++) {
+      const y = gy - 1 - i, wd = Math.max(2, Math.round(wb * (1 - 0.4 * i / th))), x0 = Math.round(tx(y) - wd / 2), fl = Math.max(0, 2 - i), xa = x0 - fl, xb = x0 + wd + fl - 1;
+      for (let x = xa; x <= xb; x++) { let col = x === xa ? T[2] : x === xb ? T[0] : T[1]; if (col === T[1] && hsh(x, y, 12) < 0.14) col = T[0]; px(x, y, col); }
+    }
+    const forkY = gy - th;
+    ccx = cx; ccy = Math.round(forkY - Hc * c * 0.5); cAmt = c;
+    if (c < 0.12) {
+      const x = tx(forkY), pl = palA;
+      px(x, forkY - 1, pl.leaf[1]); px(x - 1, forkY - 1, pl.leaf[2]); px(x + 1, forkY - 1, pl.leaf[3]); px(x - 2, forkY - 2, pl.leaf[1]); px(x + 2, forkY - 2, pl.leaf[2]);
+    } else {
+      const cl = L.clumps.map(k => ({ k, x: cx + Math.round(k.ex * U * c + sway * (0.4 + k.ey)), y: Math.round(forkY - k.ey * Hc * c - 2), r: k.r * U * (0.2 + 0.8 * c) }));
+      cls = cl;
+      const starts = L.limbs.map(l => { const ay = gy - Math.max(1, Math.round(th * l.t)); return { x: tx(ay), y: ay }; });
+      L.limbs.forEach((l, i) => { line(starts[i].x, starts[i].y, cl[i].x, cl[i].y, true, T[1]); line(starts[i].x, starts[i].y + 1, cl[i].x, cl[i].y + 1, false, T[0]); });
+      if (ss.twig) {
+        cl.forEach(o => { for (let j = 0; j < 4; j++) { const a = ((o.k.id * 0.37 + j * 1.6) % 6.28), len = Math.max(2, o.r * 0.9); line(o.x, o.y, o.x + Math.cos(a) * len, o.y + Math.sin(a) * len * 0.9, false, T[1]); } });
+        if (ss.snow > 0.3) cl.forEach(o => { px(o.x, o.y - 1, '#f4f9ff'); px(o.x + 1, o.y - 1, '#f4f9ff'); });
+      }
+      if (ss.leaves) {
+        const full = u('fruit') && ss.snow < 0.5;
+        cl.slice().sort((a, b) => a.k.ey - b.k.ey).forEach(o => {
+          const kx = o.x, ky = o.y, kr = o.r, id = o.k.id; if (kr < 1.5) return;
+          const rr = a => kr * (1 + 0.16 * Math.sin(3 * a + id) + 0.1 * Math.sin(5 * a + id * 1.7));
+          const inn = (x, y) => { const dx = x - kx, dy = (y - ky) * 1.05, r2 = rr(Math.atan2(dy, dx)); return dx * dx + dy * dy <= r2 * r2; };
+          for (let y = Math.floor(ky - kr * 1.4); y <= Math.ceil(ky + kr * 1.4); y++) for (let x = Math.floor(kx - kr * 1.4); x <= Math.ceil(kx + kr * 1.4); x++) {
+            if (x < 0 || x >= Lw || !inn(x, y)) continue;
+            const q = Math.min(1, 0.65 * hsh(x >> 1, y >> 1, 20) + 0.35 * hsh(id, 0, 22));
+            let pl = palA;
+            if (ss.mode === 'mix') { if (q < ss.tN) pl = palB; }
+            else if (ss.mode === 'fall') { if (q < ss.tN) continue; }
+            else if (ss.mode === 'bud') { if (q >= ss.tN) continue; }
+            const l = ((kx - x) * 0.5 + (ky - y) * 0.8) / kr, v = l + (BAY[(x & 1) + ((y & 1) << 1)] - 0.5) * 0.35 + (hsh(x, y, 0) - 0.5) * 0.2;
+            let tone = v > 0.45 ? 3 : v > 0 ? 2 : v > -0.5 ? 1 : 0;
+            if (hsh(x >> 1, y >> 1, 6) < 0.16) tone = Math.min(3, tone + 1); else if (hsh(x >> 1, y >> 1, 7) < 0.1) tone = Math.max(1, tone - 1);
+            const edge = !inn(x + 1, y) || !inn(x, y + 1);
+            if (edge) tone = 0; else if (hsh(x, y, 1) < 0.05 && Math.sin(now * 1.5 + hsh(x, y, 2) * 20) > 0.92) tone = 3;
+            let col = pl.leaf[tone];
+            if (pl.bloom && tone > 0 && hsh(x, y, 3) < (full ? 0.22 : 0.12) * s) col = pl.bloom;
+            px(x, y, col);
+            if (full && !pl.bloom && tone > 0 && hsh(x, y, 4) < 0.012) rect(x, y, 2, 2, pl.fruit);
+            if (y < colTop[x]) colTop[x] = y;
+          }
+        });
+      }
+      // 電飾(冬)
+      if (ss.snow > 0.15) {
+        const cols = ['#ff5a5a', '#ffd84a', '#5ab8ff', '#7dff8a'], pts = [];
+        L.limbs.forEach((l, i) => { const a = starts[i], b = cl[i], n = Math.max(1, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / 4)); for (let k = 1; k <= n; k++) pts.push({ x: a.x + (b.x - a.x) * k / n + 1, y: a.y + (b.y - a.y) * k / n }); });
+        const show = Math.ceil(pts.length * Math.min(1, (ss.snow - 0.15) * 1.5));
+        pts.slice(0, show).forEach((q, i) => { const a = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now * 2.2 + i * 1.3)), col = cols[(i + Math.floor(now * 0.8)) % 4]; if (dim) rect(q.x - 1, q.y - 1, 3, 3, col, 0.18 * a); px(q.x, q.y, col, a); });
+      }
+      const bx = Math.min(Lw - 1, Math.max(0, Math.round(cx + U * 0.12)));
+      top = colTop[bx] < 1e9 ? { x: bx, y: colTop[bx] } : { x: cl[4].x, y: cl[4].y };
+    }
+  }
+  // 雪だるま
+  if (ss.snow > 0.6) { const x = Math.min(Lw - 4, cx + Math.max(10, Math.round(Lw * 0.22))); disc(x, gy - 3, 2, '#f6faff'); px(x + 2, gy - 2, '#cfe0f2'); px(x + 1, gy - 1, '#cfe0f2'); disc(x, gy - 6, 1, '#f6faff'); px(x + 1, gy - 5, '#cfe0f2'); rect(x - 1, gy - 5, 3, 1, '#d9473d'); px(x - 1, gy - 6, '#222'); px(x + 1, gy - 6, '#222'); px(x + 2, gy - 6, '#ff8a3d'); rect(x - 1, gy - 8, 3, 1, '#2a2a30'); rect(x - 2, gy - 7, 5, 1, '#2a2a30'); px(x, gy - 3, '#333'); }
+  // 動物
+  if (u('bunny')) { const a = wander(1, 6, 0.35), hop = a.mv ? Math.round(Math.abs(Math.sin(now * 9)) * 2.2) : 0, cm = snowy ? Object.assign({}, SPR.bunny.c, { b: '#eef1f6', f: '#c9d0da' }) : null; sprite(SPR.bunny, Math.round(a.x), gy - hop, a.dir < 0, cm); }
+  if (u('squirrel') && !snowy) { const a = wander(2, 8, 0.3); sprite(SPR.squirrel, Math.round(a.x), gy, a.dir < 0); }
+  if (u('hedgehog') && !snowy) { const a = wander(3, 16, 0.2); sprite(SPR.hedgehog, Math.round(a.x), gy, a.dir < 0); }
+  if (u('fox')) { const a = wander(4, 22, 0.45); sprite(SPR.fox, Math.round(a.x), gy - (a.mv && Math.floor(now * 6) % 2 ? 1 : 0), a.dir < 0); }
+  if (u('deer')) { const a = wander(5, 28, 0.4); sprite(SPR.deer, Math.round(a.x), gy - (a.mv && Math.floor(now * 4) % 2 ? 1 : 0), a.dir < 0); }
+  if (u('owl') && cls && cAmt >= 0.5) { const o = cls[0], awake = dim; sprite(awake ? SPR.owl : SPR.owlz, o.x, o.y + 3, false, awake ? Object.assign({}, SPR.owl.c, { K: '#ffd84a' }) : null); }
+  if (phase !== 'none' && night) { ctx.globalCompositeOperation = 'source-atop'; rect(0, 0, Lw, Lh, '#0a1030', 0.3); ctx.globalCompositeOperation = 'source-over'; }
+  // 花びら・落ち葉・雪
+  let pn = 0, pp = palA;
+  if (ss.k < 0) pn = base.petals && s > 0.5 ? Math.round(12 * s) : 0;
+  else if (ss.k === 0) { pn = base.petals ? Math.round(12 * (1 - ss.tN)) : 0; pp = base; }
+  else if (ss.k === 2) { pn = Math.round(10 + 14 * ss.tN); pp = PAL.autumn; }
+  else if (ss.k === 3) { pn = base.petals ? Math.round(10 * ss.tN) : 0; pp = base; }
+  for (let i = 0; i < pn; i++) { const x = (hsh(i, 0, 9) * Lw + Math.sin(now * 0.7 + i) * 4 + Lw * 4) % Lw, y = (now * 3 + hsh(i, 1, 9) * gy) % gy; px(x, y, i % 2 ? pp.leaf[3] : pp.leaf[2]); }
+  for (let i = 0, n = Math.round(30 * Math.min(1, ss.snow * 1.3)); i < n; i++) { const x = (hsh(i, 0, 13) * Lw + Math.sin(now * 0.8 + i) * 2 + Lw * 4) % Lw, y = (now * 4 + hsh(i, 1, 13) * gy) % gy; px(x, y, '#ffffff', 0.9); }
+  // 空を舞うもの
+  if (u('lantern')) { const x = Math.max(2, Lw - 6); rect(x, gy - 5, 1, 5, '#4a4a52'); rect(x - 1, gy - 7, 3, 2, dim ? '#ffd166' : '#c9a24a'); if (dim) for (let j = -4; j <= 4; j++) for (let i = -4; i <= 4; i++) if (i * i + j * j <= 16) px(x + i, gy - 6 + j, '#ffd166', 0.07); }
+  if (u('fly') && !night && ss.snow < 0.5) { const d = D('fly'), bx = cx + Math.sin(now * 0.7 + d.c) * Lw * 0.33, by = gy * 0.72 + Math.sin(now * 1.3) * gy * 0.05, f = Math.floor(now * 5) % 2, col = ['#ff9f43', '#6ec3ff', '#ff7fb0'][d.c]; px(bx, by, '#3a2a2a'); px(bx - 1, by - f, col); px(bx + 1, by - f, col); }
+  if (u('bird') && top) { const hop = Math.floor(now * 0.6) % 8 === 0 ? 1 : 0, bx = top.x, by = top.y - hop; rect(bx - 1, by - 2, 3, 2, '#5a7fd6'); px(bx + 2, by - 3, '#7fa0ea'); px(bx + 3, by - 3, '#ffb347'); px(bx - 2, by - 1, '#3f5fb0'); px(bx + 1, by - 3, '#7fa0ea'); }
+  if (u('firefly') && dim && ss.snow < 0.5) for (let i = 0; i < 8; i++) {
+    const x = (D('firefly').x + i * Lw / 8 + Math.sin(now * 0.5 + i * 1.7) * 6 + Lw) % Lw, y = gy - 6 - ((i * 53) % Math.max(8, Math.floor(gy * 0.25))) + Math.sin(now * 0.8 + i) * 3, a = 0.3 + 0.7 * Math.max(0, Math.sin(now * 2.1 + i * 2.3));
+    rect(x - 1, y - 1, 3, 3, '#fff3a0', a * 0.18); px(x, y, '#fff3a0', a);
+  }
+  // 水やりの演出
+  const fx = plFx(w.id), keep = [];
+  for (const f of fx) {
+    if (f.k === 'drop') {
+      const yf = (now - f.t0 - f.dl) * 0.9;
+      if (yf < 0) { keep.push(f); continue; }
+      if (yf >= 1) { keep.push({ k: 'sp', xf: f.xf, t0: now }); continue; }
+      rect(f.xf * Lw, yf * gy, 1, 2, '#6cc3ff'); keep.push(f);
+    } else if (f.k === 'sp') {
+      const a = (now - f.t0) / 0.45; if (a >= 1) continue;
+      const x = Math.round(f.xf * Lw), r = Math.round(a * 3), y = gy - 1 - Math.round(Math.sin(a * 3) * 2);
+      px(x - r, y, '#bfe7ff'); px(x + r, y, '#bfe7ff'); keep.push(f);
+    } else if (f.k === 'burst') {
+      const a = (now - f.t0) / 0.9; if (a < 0) { keep.push(f); continue; } if (a >= 1) continue;
+      for (let i = 0; i < 8; i++) { const ang = i * 0.785 + a, r = 3 + a * 10; px(ccx + Math.cos(ang) * r, ccy + Math.sin(ang) * r * 0.8, '#fff6a0', 1 - a); }
+      keep.push(f);
+    }
+  }
+  fx.length = 0; keep.forEach(k => fx.push(k));
+}
+function mountPlant(el, w) {
+  const cv = el.querySelector('canvas.pl'); if (!cv) return;
+  const pad = clamp(Math.round(w.props.pad) || 0, 0, 60), inner = el.querySelector('.in'); if (inner) inner.style.inset = pad + 'px';
+  const ps = clamp(Math.round(w.props.ps) || 4, 2, 10), Lw = Math.max(16, Math.floor((w.w - pad * 2) / ps)), Lh = Math.max(24, Math.floor((w.h - pad * 2) / ps));
+  cv.width = Lw; cv.height = Lh; cv.style.cssText = `width:${Lw * ps}px;height:${Lh * ps}px;image-rendering:pixelated`;
+  const ctx = cv.getContext('2d');
+  const tick = () => { if (!cv.isConnected) return false; plantFrame(ctx, w, Lw, Lh); return true; };
+  tick();
+  const iv = setInterval(() => { if (!tick()) clearInterval(iv); }, 70);
+  if (PLMSG && PLMSG.id === w.id && Date.now() - PLMSG.t < 2400) { const d = document.createElement('div'); d.className = 'plmsg'; d.textContent = PLMSG.text; el.appendChild(d); }
+}
+function afterDraw(el, w) { tickClocks(el); if (w.type === 'plant') mountPlant(el, w); }
+
+/* ============================================================
+   部品のデータ
+   ============================================================ */
+function defProps(type) {
+  if (type === 'task') return { layout: 'card', items: [{ text: '新しいタスク', note: '', subs: [] }], title: '', label: 'NOTES · TARKOV', showLabel: false, showCount: false, underline: true, dim: true, bar: true, flash: true, hold: 1300 };
+  if (type === 'list') return { title: '探しているもの', items: [{ text: 'アイテム名', mode: 'count', need: 1 }] };
+  if (type === 'grid') return { title: '', cols: 2, names: false, items: [{ text: 'アイテム名', img: '', mode: 'count', need: 1 }] };
+  if (type === 'image') return { src: '', fit: 'contain', pad: 0 };
+  if (type === 'plant') return { species: 'tree', seed: 'roza', ps: 4, steps: 20, sky: 'auto', auto: 0, decor: true, seasons: true, seasonLen: 4, fade: 10, pad: 6 };
+  if (type === 'clock') return { format: '24', seconds: false, date: false, label: '' };
+  return { label: '', text: 'テキストを入力', align: 'left', size: 24, bold: true };
+}
+const defState = type => type === 'plant' ? { g: 0, rev: 0 } : type === 'task' ? { p: 0 } : (type === 'list' || type === 'grid') ? { vals: [0] } : {};
+function newWidget(type, over) {
+  return Object.assign({ id: uid(), type, name: TYPE_NAMES[type], x: 40, y: 40, w: 300, h: 160, panel: true, scale: 100, density: 'tight', props: defProps(type), state: defState(type) }, over || {});
+}
+function normWidget(o) {
+  if (!o || !TYPE_NAMES[o.type]) return null;
+  const t = o.type, d = newWidget(t), p = o.props || {}, dp = d.props;
+  const w = {
+    id: str(o.id, d.id) || d.id, type: t, name: str(o.name, d.name).slice(0, 30),
+    x: Math.round(num(o.x, d.x, 0, W)), y: Math.round(num(o.y, d.y, 0, H)), w: Math.round(num(o.w, d.w, 40, W)), h: Math.round(num(o.h, d.h, 24, H)),
+    panel: bool(o.panel, true), scale: num(o.scale, 100, 50, 200), density: pick(o.density, Object.keys(DENS), 'tight'), props: {}, state: {}
+  };
+  const st = o.state || {};
+  if (t === 'task') {
+    const items = Array.isArray(p.items) ? p.items.slice(0, 60).map(i => ({ text: str(i && i.text, ''), note: str(i && i.note, ''), subs: Array.isArray(i && i.subs) ? i.subs.slice(0, 20).map(x => str(x, '')) : [] })) : dp.items;
+    w.props = { layout: pick(p.layout, ['card', 'bar'], 'card'), items, title: str(p.title, ''), label: str(p.label, dp.label), showLabel: bool(p.showLabel, false), showCount: bool(p.showCount, false), underline: bool(p.underline, true), dim: bool(p.dim, true), bar: bool(p.bar, true), flash: bool(p.flash, true), hold: num(p.hold, 1300, 400, 3000) };
+    w.state = { p: clamp(parseInt(st.p) || 0, 0, taskTotal(items)) };
+  } else if (t === 'list') {
+    const items = Array.isArray(p.items) ? p.items.slice(0, 40).map(i => ({ text: str(i && i.text, ''), mode: pick(i && i.mode, ['count', 'check'], 'count'), need: Math.round(num(i && i.need, 0, 0, 9999)) })) : dp.items;
+    w.props = { title: str(p.title, ''), items };
+    const vals = Array.isArray(st.vals) ? st.vals : [];
+    w.state = { vals: items.map((it, i) => { const v = Math.max(0, Math.round(num(vals[i], 0, 0, 99999))); return it.mode === 'check' ? Math.min(1, v) : v; }) };
+  } else if (t === 'grid') {
+    const items = Array.isArray(p.items) ? p.items.slice(0, 40).map(i => ({ text: str(i && i.text, ''), img: okImg(i && i.img) ? i.img : '', mode: pick(i && i.mode, ['count', 'check'], 'count'), need: Math.round(num(i && i.need, 0, 0, 9999)) })) : dp.items;
+    w.props = { title: str(p.title, ''), cols: Math.round(num(p.cols, 2, 1, 4)), names: bool(p.names, false), items };
+    const vals = Array.isArray(st.vals) ? st.vals : [];
+    w.state = { vals: items.map((it, i) => { const v = Math.max(0, Math.round(num(vals[i], 0, 0, 99999))); return it.mode === 'check' ? Math.min(1, v) : v; }) };
+  } else if (t === 'plant') {
+    w.props = { species: pick(p.species, Object.keys(PAL), 'tree'), seed: str(p.seed, 'roza').slice(0, 20), ps: Math.round(num(p.ps, 4, 2, 10)), steps: Math.round(num(p.steps, 20, 3, 500)), sky: pick(p.sky, ['auto', 'day', 'sunset', 'night', 'none'], 'auto'), auto: Math.round(num(p.auto, 0, 0, 240)), decor: bool(p.decor, true), seasons: bool(p.seasons, true), seasonLen: Math.round(num(p.seasonLen, 4, 1, 99)), fade: Math.round(num(p.fade, 10, 0, 60)), pad: Math.round(num(p.pad, 6, 0, 60)) };
+    w.state = { g: Math.round(num(st.g, 0, 0, 9999)), rev: Math.round(num(st.rev, 0, 0, 1000000)) };
+  } else if (t === 'image') {
+    w.props = { src: okImg(p.src) ? p.src : '', fit: pick(p.fit, ['contain', 'cover'], 'contain'), pad: Math.round(num(p.pad, 0, 0, 60)) };
+  } else if (t === 'clock') {
+    w.props = { format: pick(p.format, ['24', '12'], '24'), seconds: bool(p.seconds, false), date: bool(p.date, false), label: str(p.label, '') };
+  } else {
+    w.props = { label: str(p.label, ''), text: str(p.text, ''), align: pick(p.align, ['left', 'center', 'right'], 'left'), size: Math.round(num(p.size, 24, 10, 120)), bold: bool(p.bold, true) };
+  }
+  return w;
+}
+function normTheme(o) {
+  const d = THEMES.memo; o = o || {};
+  return { font: FONTS[o.font] ? o.font : d.font, accent: hex(o.accent, d.accent), bg: hex(o.bg, d.bg), alpha: num(o.alpha, d.alpha, 0, 100), frameBg: hex(o.frameBg, d.frameBg) };
+}
+function normalize(o) {
+  if (!o || typeof o !== 'object') return defaultProject();
+  const g = o.game || {}, seen = new Set();
+  const widgets = (Array.isArray(o.widgets) ? o.widgets : []).slice(0, 12).map(normWidget).filter(Boolean);
+  widgets.forEach(w => { while (seen.has(w.id)) w.id = uid(); seen.add(w.id); });
+  const rm = o.remote || {};
+  return { v: 3, remote: { on: bool(rm.on, false), port: Math.round(num(rm.port, 4580, 1024, 65535)) }, theme: normTheme(o.theme), game: { x: Math.round(num(g.x, 8, 0, W)), y: Math.round(num(g.y, 8, 0, H)), w: Math.round(num(g.w, 1680, 320, W)) }, widgets };
+}
+
+/* ---------- 見本の中身とテンプレート ---------- */
+function sampleTask(layout) {
+  const w = newWidget('task', { name: 'クエストメモ' });
+  w.props.layout = layout;
+  w.props.items = [
+    { text: 'Ragmanと話す', note: '', subs: [] },
+    { text: 'Interchangeから生還する', note: 'Interchangeに入り、脱出口から無事に出る。', subs: [] },
+    { text: 'Ragmanに偵察中に発見したことを報告する', note: '', subs: [] },
+    { text: 'Terminalへの入り口を特定する', note: '', subs: ['Terminalにいる兵士と連絡する手段を見つける', 'インターホンで港の駐屯所に連絡する'] }
+  ];
+  w.state = { p: 0 };
+  return w;
+}
+function sampleList() {
+  const w = newWidget('list', { name: '探しているもの' });
+  w.props.items = [{ text: '工具セット', mode: 'count', need: 2 }, { text: '電池', mode: 'count', need: 3 }, { text: '地図', mode: 'check', need: 0 }];
+  w.state = { vals: [0, 0, 0] };
+  return w;
+}
+function sampleGoal(over) {
+  const w = newWidget('text', Object.assign({ name: '今日の目標' }, over));
+  w.props.label = '今日の目標'; w.props.text = 'Ragman解放まで'; w.props.size = 26;
+  return w;
+}
+function template(name) {
+  if (name === 'A') {
+    const t = Object.assign(sampleTask('bar'), { x: 8, y: 961, w: 1100, h: 111 });
+    const g = sampleGoal({ x: 1116, y: 961, w: 572, h: 111 });
+    const l = Object.assign(sampleList(), { x: 1696, y: 8, w: 216, h: 945 });
+    const c = newWidget('clock', { name: '時計', x: 1696, y: 961, w: 216, h: 111 });
+    return { game: { x: 8, y: 8, w: 1680 }, widgets: [t, g, l, c] };
+  }
+  if (name === 'B') {
+    const t = Object.assign(sampleTask('card'), { x: 8, y: 898, w: 520, h: 174 });
+    const g = sampleGoal({ x: 536, y: 898, w: 1040, h: 174 });
+    const l = Object.assign(sampleList(), { x: 1584, y: 8, w: 328, h: 930 });
+    const c = newWidget('clock', { name: '時計', x: 1584, y: 946, w: 328, h: 126 });
+    return { game: { x: 8, y: 8, w: 1568 }, widgets: [t, g, l, c] };
+  }
+  return { game: { x: 8, y: 8, w: 1680 }, widgets: [] };
+}
+function defaultProject() { const t = template('A'); return { v: 3, remote: { on: false, port: 4580 }, theme: Object.assign({}, THEMES.memo), game: t.game, widgets: t.widgets }; }
+
+/* ============================================================
+   部品の描画
+   ============================================================ */
+function applyWidgetBox(el, w, th) {
+  el.className = `wc t-${w.type}${w.type === 'task' ? ' lay-' + w.props.layout : ''}${w.panel ? ' inpanel' : ''}`;
+  el.style.cssText = `--s:${w.scale / 100};--d:${DENS[w.density]};--bgc:${rgba(th.bg, th.alpha)};--accent:${th.accent};--ff:${FONTS[th.font]};--ffs:${th.font === 'serif' ? SANS : FONTS[th.font]}`;
+}
+function taskHTML(w, holding, enter) {
+  const p = w.props, items = p.items, T = items.length, tot = taskTotal(items), pos = w.state.p;
+  let ti, si = 0, forced = false;
+  if (holding !== null && holding !== undefined) { ti = holding; forced = true; }
+  else { const l = taskLocate(items, pos); ti = l.ti; si = l.si; }
+  const pad = n => String(n).padStart(2, '0');
+  const counter = p.showCount && T ? `${pad(Math.min(ti + 1, T))} / ${pad(T)}` : '';
+  const label = p.showLabel ? p.label : '';
+  const meta = label || counter ? `<div class="meta"><span>${esc(label)}</span><span>${counter}</span></div>` : '';
+  const bar = p.bar && tot ? `<div class="bar"><i style="width:${(clamp(pos, 0, tot) / tot) * 100}%"></i></div>` : '';
+  const subLi = (it) => it.subs.map((t, i) => {
+    const done = forced || i < si, next = !forced && i === si;
+    return `<li class="sub${done ? ' done' : ''}${next ? ' next' : ''}${!done && !next && p.dim ? ' dm' : ''}"><i class="bx"></i>${esc(t)}</li>`;
+  }).join('');
+  let h = `<div class="in${enter ? ' enter' : ''}">`;
+  if (p.layout === 'bar') {
+    if (!T) h += '<div class="empty">項目がありません</div>';
+    else if (ti >= T) h += '<div class="all">ALL COMPLETE</div>';
+    else {
+      const it = items[ti], n = it.subs.length;
+      const rows = Math.min(4, n <= 3 ? Math.max(n, 1) : Math.ceil(n / 2));
+      h += `<div class="bl${n ? '' : ' solo'}">${meta}<div class="main${forced ? ' done' : ''}">${esc(it.text)}</div>${it.note && !forced ? `<div class="nt">${esc(it.note)}</div>` : ''}</div>`;
+      if (n) h += `<ul class="br subs" style="--rows:${rows}">${subLi(it)}</ul>`;
+    }
+  } else {
+    h += meta;
+    if (p.title) h += `<h1 class="ttl${p.underline ? ' ul' : ''}">${esc(p.title)}</h1>`;
+    if (!T) h += '<div class="empty">項目がありません</div>';
+    else if (ti >= T) h += '<div class="all">ALL COMPLETE</div>';
+    else {
+      const it = items[ti];
+      h += `<div class="main${forced ? ' done' : ''}">${esc(it.text)}</div>`;
+      if (it.note && !forced) h += `<div class="nt">${esc(it.note)}</div>`;
+      if (it.subs.length) h += `<ul class="subs">${subLi(it)}</ul>`;
+    }
+  }
+  h += bar + '</div>';
+  if (forced && p.flash) h += '<div class="flash">TASK COMPLETE</div>';
+  return h;
+}
+function listHTML(w) {
+  const p = w.props;
+  let h = '<div class="in">';
+  if (p.title) h += `<div class="lt">${esc(p.title)}</div>`;
+  if (!p.items.length) h += '<div class="empty">項目がありません</div>';
+  else {
+    h += '<ul class="ls">' + p.items.map((it, i) => {
+      const v = w.state.vals[i] || 0, need = it.mode === 'count' ? it.need : 0;
+      const done = it.mode === 'check' ? v >= 1 : need > 0 && v >= need;
+      const box = it.mode === 'check' || need > 0 ? '<i class="bx"></i>' : '';
+      const cnt = it.mode === 'check' ? '' : `<span class="lc">${need > 0 ? v + ' / ' + need : v}</span>`;
+      return `<li class="li${done ? ' done' : ''}" data-i="${i}">${box}<span class="lx">${esc(it.text)}</span>${cnt}</li>`;
+    }).join('') + '</ul>';
+  }
+  return h + '</div>';
+}
+function gridHTML(w) {
+  const p = w.props, fx = FX && FX.id === w.id ? FX.i : -1; if (fx >= 0) FX = null;
+  let h = `<div class="in" style="--cols:${p.cols}">`;
+  if (p.title) h += `<div class="lt">${esc(p.title)}</div>`;
+  if (!p.items.length) return h + '<div class="empty">項目がありません</div></div>';
+  h += '<div class="gs">' + p.items.map((it, i) => {
+    const v = w.state.vals[i] || 0, need = it.mode === 'count' ? it.need : 0;
+    const done = it.mode === 'check' ? v >= 1 : need > 0 && v >= need;
+    const cnt = it.mode === 'check' ? '' : `<span class="gc">${need > 0 ? v + '/' + need : v}</span>`;
+    const body = it.img ? `<img src="${esc(it.img)}" alt="">` : `<span class="nm">${esc(it.text)}</span>`;
+    return `<div class="gt${done ? ' done' : ''}${i === fx ? ' fx' : ''}" data-i="${i}">${body}${cnt}${p.names && it.img ? `<span class="gn">${esc(it.text)}</span>` : ''}</div>`;
+  }).join('') + '</div></div>';
+  return h;
+}
+const imageHTML = w => w.props.src ? `<div class="in" style="padding:${w.props.pad | 0}px"><img class="pimg" src="${esc(w.props.src)}" alt="" style="object-fit:${w.props.fit}"></div>` : '<div class="in"><div class="empty" style="padding:10px;font-size:14px">画像を選んでください</div></div>';
+const clockHTML = w => { const p = w.props; return `<div class="in">${p.label ? `<div class="cd">${esc(p.label)}</div>` : ''}<div class="ck" data-f="${p.format}" data-s="${p.seconds ? 1 : 0}"></div>${p.date ? '<div class="cd cdate"></div>' : ''}</div>`; };
+const textHTML = w => { const p = w.props; return `<div class="in">${p.label ? `<div class="lt">${esc(p.label)}</div>` : ''}<div class="tb" style="--fs:${p.size}px;text-align:${p.align};font-weight:${p.bold ? 700 : 500}">${esc(p.text)}</div></div>`; };
+function widgetInner(w, rt, enter) {
+  if (w.type === 'task') return taskHTML(w, rt ? rt.holding : null, enter);
+  if (w.type === 'list') return listHTML(w);
+  if (w.type === 'grid') return gridHTML(w);
+  if (w.type === 'plant') return '<div class="in"><canvas class="pl"></canvas></div>';
+  if (w.type === 'image') return imageHTML(w);
+  if (w.type === 'clock') return clockHTML(w);
+  return textHTML(w);
+}
+function tickClocks(root) {
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  root.querySelectorAll('.ck').forEach(el => {
+    let h = d.getHours(), suf = '';
+    if (el.dataset.f === '12') { suf = h >= 12 ? ' PM' : ' AM'; h = h % 12 || 12; } else h = z(h);
+    el.textContent = `${h}:${z(d.getMinutes())}${el.dataset.s === '1' ? ':' + z(d.getSeconds()) : ''}${suf}`;
+  });
+  root.querySelectorAll('.cdate').forEach(el => { el.textContent = `${d.getFullYear()}/${z(d.getMonth() + 1)}/${z(d.getDate())} (${'日月火水木金土'[d.getDay()]})`; });
+}
+function listClick(w, i, dir) {
+  const it = w.props.items[i]; if (!it) return false;
+  let v = w.state.vals[i] || 0;
+  if (it.mode === 'check') v = v ? 0 : 1;
+  else if (dir > 0) v = it.need > 0 ? Math.min(v + 1, it.need) : v + 1;
+  else v = Math.max(0, v - 1);
+  w.state.vals[i] = v; return true;
+}
+
+/* タスクメモの進行(エディタとOBSで共通) */
+function makeTaskCtl(getW, redraw, onChange) {
+  let holding = null, timer = null;
+  const clear = () => { clearTimeout(timer); timer = null; holding = null; };
+  const finish = enter => { clear(); redraw(enter); };
+  return {
+    get holding() { return holding; },
+    refresh() { clear(); redraw(false); },
+    advance() {
+      const w = getW(), items = w.props.items, tot = taskTotal(items); if (!tot) return;
+      if (holding !== null) finish(false);
+      if (w.state.p >= tot) return;
+      const before = taskLocate(items, w.state.p).ti;
+      w.state.p++; onChange();
+      const after = taskLocate(items, w.state.p).ti;
+      if (after !== before && w.props.flash) { holding = before; redraw(false); timer = setTimeout(() => finish(true), w.props.hold); }
+      else redraw(after !== before);
+    },
+    back() {
+      const w = getW(), items = w.props.items; if (!taskTotal(items)) return;
+      const was = holding !== null ? holding : taskLocate(items, w.state.p).ti;
+      clear();
+      if (w.state.p > 0) w.state.p--;
+      onChange(); redraw(taskLocate(items, w.state.p).ti !== was);
+    },
+    reset() { const w = getW(); clear(); w.state.p = 0; onChange(); redraw(true); }
+  };
+}
+
+/* ============================================================
+   外枠(キャンバスに描く)
+   ============================================================ */
+function drawFrame(c, S) {
+  const th = S.theme, g = S.game, gh = Math.round(g.w * 9 / 16);
+  c.clearRect(0, 0, W, H);
+  const gr = c.createLinearGradient(0, 0, W, H);
+  gr.addColorStop(0, shade(th.frameBg, 6)); gr.addColorStop(1, shade(th.frameBg, -35));
+  c.fillStyle = gr;
+  c.beginPath(); c.rect(0, 0, W, H); c.rect(g.x, g.y, g.w, gh); c.fill('evenodd');
+  c.strokeStyle = th.accent; c.lineWidth = 2; c.strokeRect(g.x - 1, g.y - 1, g.w + 2, gh + 2);
+  for (const w of S.widgets) {
+    if (!w.panel) continue;
+    c.fillStyle = rgba(th.bg, th.alpha); c.fillRect(w.x, w.y, w.w, w.h);
+    c.strokeStyle = rgba(th.accent, 45); c.lineWidth = 1; c.strokeRect(w.x + .5, w.y + .5, w.w - 1, w.h - 1);
+    c.strokeStyle = th.accent; c.lineWidth = 2;
+    const L = Math.min(14, w.w / 3, w.h / 3), x0 = w.x + 1, y0 = w.y + 1, x1 = w.x + w.w - 1, y1 = w.y + w.h - 1;
+    c.beginPath();
+    c.moveTo(x0, y0 + L); c.lineTo(x0, y0); c.lineTo(x0 + L, y0);
+    c.moveTo(x1 - L, y0); c.lineTo(x1, y0); c.lineTo(x1, y0 + L);
+    c.moveTo(x0, y1 - L); c.lineTo(x0, y1); c.lineTo(x0 + L, y1);
+    c.moveTo(x1 - L, y1); c.lineTo(x1, y1); c.lineTo(x1, y1 - L);
+    c.stroke();
+  }
+}
+
+/* ============================================================
+   OBS用ビュー
+   ============================================================ */
+function viewInit(kind, data) {
+  document.body.classList.add('view');
+  document.documentElement.style.background = 'transparent';
+  let d = null;
+  try { d = dec(data); } catch (e) {}
+  const wrap = $('vwrap');
+  if (kind === 'f') {
+    const th = normTheme(d && d.theme), g = d && d.game || {};
+    const S = { theme: th, game: { x: num(g.x, 8, 0, W), y: num(g.y, 8, 0, H), w: num(g.w, 1680, 320, W) },
+      widgets: ((d && d.rects) || []).slice(0, 12).map(r => ({ panel: true, x: num(r.x, 0, 0, W), y: num(r.y, 0, 0, H), w: num(r.w, 40, 1, W), h: num(r.h, 24, 1, H) })) };
+    const cv = document.createElement('canvas'); cv.id = 'vf'; cv.width = W; cv.height = H;
+    wrap.appendChild(cv); drawFrame(cv.getContext('2d'), S);
+    return;
+  }
+  const th = normTheme(d && d.theme);
+  const isPlant = !!(d && d.w && d.w.type === 'plant' && d.w.id);
+  const key = isPlant ? 'tmm3p_' + hash(String(d.w.id)) : 'tmm3_' + hash(JSON.stringify([d && d.theme, d && d.w]));
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(key)); } catch (e) {}
+  if (isPlant && saved && (saved.rev | 0) !== ((d.st && d.st.rev) | 0)) saved = null;
+  let w = normWidget(Object.assign({}, d && d.w, { state: saved || (d && d.st) || {} })) || newWidget('text');
+  wrap.style.width = w.w + 'px'; wrap.style.height = w.h + 'px';
+  const el = document.createElement('div'); wrap.appendChild(el);
+  const persist = () => { try { localStorage.setItem(key, JSON.stringify(w.state)); } catch (e) {} };
+  let ctl = null;
+  const draw = enter => {
+    applyWidgetBox(el, w, th);
+    el.innerHTML = widgetInner(w, ctl, enter);
+    afterDraw(el, w);
+  };
+  if (w.type === 'task') {
+    ctl = makeTaskCtl(() => w, draw, persist);
+    $('vctl').hidden = false;
+    $('vnext').onclick = () => ctl.advance(); $('vprev').onclick = () => ctl.back();
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); ctl.advance(); }
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); ctl.back(); }
+    });
+  }
+  if (w.type === 'list' || w.type === 'grid') {
+    const act = (e, dir) => { const li = e.target.closest('.li, .gt'); if (!li) return; e.preventDefault(); if (listClick(w, +li.dataset.i, dir)) { if (dir > 0 && w.type === 'grid') setFx(w.id, +li.dataset.i); persist(); draw(false); } };
+    el.addEventListener('click', e => act(e, e.shiftKey ? -1 : 1));
+    el.addEventListener('contextmenu', e => act(e, -1));
+  }
+  const rp = parseInt(d && d.rp, 10);
+  if (rp >= 1024 && rp <= 65535) {
+    const onCmd = c => {
+      if (!c || (c.part && c.part !== w.name)) return;
+      let ch = false;
+      if (w.type === 'task') { if (c.cmd === 'next') { ctl.advance(); } else if (c.cmd === 'prev') { ctl.back(); } }
+      else if (w.type === 'plant') { if (c.cmd === 'water') { waterPlant(w, 1); ch = true; } else if (c.cmd === 'unwater') { waterPlant(w, -1); ch = true; } }
+      else if ((w.type === 'list' || w.type === 'grid') && c.cmd === 'item') {
+        const i = parseInt(c.arg, 10) - 1;
+        if (i >= 0 && listClick(w, i, c.minus ? -1 : 1)) { if (!c.minus && w.type === 'grid') setFx(w.id, i); ch = true; }
+      }
+      if (ch) { persist(); draw(false); }
+    };
+    let last = -1;
+    const loop = async () => {
+      try {
+        const r = await fetch('http://127.0.0.1:' + rp + '/poll?since=' + last, { cache: 'no-store' }), j = await r.json();
+        if (last < 0 || j.last < last) last = j.last; else { last = j.last; (j.cmds || []).forEach(onCmd); }
+      } catch (e) {}
+      setTimeout(loop, 300);
+    };
+    loop();
+  }
+  if (w.type === 'plant') {
+    el.addEventListener('click', e => { if (!e.target.closest('.pl')) return; waterPlant(w, 1); persist(); draw(false); });
+    el.addEventListener('contextmenu', e => { e.preventDefault(); waterPlant(w, -1); persist(); draw(false); });
+    if (w.props.auto > 0) setInterval(() => { waterPlant(w, 1); persist(); draw(false); }, w.props.auto * 60000);
+  }
+  draw(false);
+  if (w.type === 'clock') setInterval(() => tickClocks(el), 1000);
+}
+
+/* ============================================================
+   エディタ
+   ============================================================ */
+function loadProject() {
+  try { const o = JSON.parse(localStorage.getItem(KEY)); if (o) return normalize(o); } catch (e) {}
+  // 旧版(タスクメモ単体)のデータがあれば引き継ぐ
+  try {
+    const o = JSON.parse(localStorage.getItem('tmm_state_v2'));
+    if (o && Array.isArray(o.items)) {
+      const S = defaultProject(), tw = S.widgets.find(x => x.type === 'task');
+      const t = normWidget({ type: 'task', props: { items: o.items }, state: { p: o.p } });
+      if (t) { tw.props.items = t.props.items; tw.state.p = t.state.p; }
+      if (o.st) Object.assign(S.theme, normTheme({ font: o.st.font, accent: o.st.accent, bg: o.st.bg, alpha: o.st.alpha }));
+      return normalize(S);
+    }
+  } catch (e) {}
+  return defaultProject();
+}
+
+function editorInit() {
+  let S = loadProject(), selId = S.widgets[0] ? S.widgets[0].id : null, tmode = 'list', k = 1, drag = null, suppress = false;
+  const rts = new Map(), boxes = new Map();
+  const fctx = $('fc').getContext('2d');
+  const cur = () => S.widgets.find(w => w.id === selId) || null;
+  const byId = id => S.widgets.find(w => w.id === id);
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { try { toast('ブラウザの保存容量がいっぱいです。画像を減らしてください'); } catch (_) {} } };
+  let msgTimer = null;
+  const toast = t => { $('msg').textContent = t; clearTimeout(msgTimer); msgTimer = setTimeout(() => $('msg').textContent = '', 3500); };
+  const gh = () => Math.round(S.game.w * 9 / 16);
+
+  /* ----- 描画 ----- */
+  function getRT(w) {
+    if (w.type !== 'task') return null;
+    let c = rts.get(w.id);
+    if (!c) {
+      c = makeTaskCtl(() => byId(w.id), e => { const x = byId(w.id); if (x) renderWidget(x, e); }, () => { save(); updateOuts(); updateTaskCnt(); });
+      rts.set(w.id, c);
+    }
+    return c;
+  }
+  function boxFor(w) {
+    let b = boxes.get(w.id);
+    if (!b) {
+      b = document.createElement('div'); b.className = 'wbox'; b.dataset.id = w.id;
+      b.innerHTML = '<div class="wc"></div><div class="wtag"></div><div class="rh"></div>';
+      $('cv').appendChild(b); boxes.set(w.id, b);
+    }
+    return b;
+  }
+  function renderWidget(w, enter) {
+    const b = boxFor(w);
+    b.style.left = w.x + 'px'; b.style.top = w.y + 'px'; b.style.width = w.w + 'px'; b.style.height = w.h + 'px';
+    const el = b.firstChild;
+    applyWidgetBox(el, w, S.theme);
+    el.innerHTML = widgetInner(w, getRT(w), enter);
+    afterDraw(el, w);
+    b.querySelector('.wtag').textContent = w.name;
+    b.classList.toggle('sel', w.id === selId);
+    b.classList.toggle('over', el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2);
+    if (w.id === selId) updateOverMsg();
+  }
+  function drawGame() {
+    const g = $('gbox');
+    g.style.left = S.game.x + 'px'; g.style.top = S.game.y + 'px'; g.style.width = S.game.w + 'px'; g.style.height = gh() + 'px';
+    g.querySelector('.gtag').innerHTML = `GAME<br><span style="font-size:26px">${S.game.w} × ${gh()}</span>`;
+    g.classList.toggle('sel', selId === 'game');
+  }
+  function renderAll() {
+    drawFrame(fctx, S); drawGame();
+    const ids = new Set(S.widgets.map(w => w.id));
+    boxes.forEach((b, id) => { if (!ids.has(id)) { b.remove(); boxes.delete(id); rts.delete(id); } });
+    S.widgets.forEach(w => renderWidget(w));
+    updateOuts(); updateGinfo(); syncGameInputs();
+  }
+  function touch(w) {
+    if (w.type === 'task') w.state.p = clamp(w.state.p, 0, taskTotal(w.props.items));
+    const rt = getRT(w); if (rt) rt.refresh(); else renderWidget(w);
+    drawFrame(fctx, S); save(); updateOuts();
+  }
+  function updateOverMsg() {
+    const o = $('overmsg'); if (!o) return;
+    const b = selId && boxes.get(selId);
+    o.textContent = b && b.classList.contains('over') ? '⚠ 中身が枠からはみ出しています。大きさを広げるか、文字の大きさを下げてください。' : '';
+  }
+
+  /* ----- 部品リスト ----- */
+  function buildWList() {
+    $('wlist').innerHTML = S.widgets.map(w => `
+      <div class="wrow${w.id === selId ? ' on' : ''}" data-id="${esc(w.id)}">
+        <span class="wn">${esc(w.name)}</span><span class="wt">${esc(TYPE_NAMES[w.type])}</span>
+        <button class="mini" data-wact="dup" title="複製">⧉</button><button class="mini" data-wact="del" title="削除">✕</button>
+      </div>`).join('') || '<p class="help">部品がありません。下のボタンから追加してください。</p>';
+  }
+  $('addtype').innerHTML = Object.keys(TYPE_NAMES).map(t => `<option value="${t}">${TYPE_NAMES[t]}</option>`).join('');
+  $('addw').onclick = () => {
+    if (S.widgets.length >= 12) return toast('部品は12個までです');
+    const t = $('addtype').value, w = newWidget(t);
+    if (t === 'image') w.panel = false;
+    const sizes = { task: [520, 174], list: [300, 300], grid: [216, 420], clock: [216, 111], text: [360, 111], image: [200, 200], plant: [216, 700] };
+    w.w = sizes[t][0]; w.h = sizes[t][1];
+    w.x = clamp(Math.round((W - w.w) / 2), 0, W); w.y = clamp(Math.round((H - w.h) / 2), 0, H);
+    S.widgets.push(w); select(w.id, true); renderAll(); save();
+  };
+  $('wlist').addEventListener('click', e => {
+    const row = e.target.closest('.wrow'); if (!row) return;
+    const id = row.dataset.id, b = e.target.closest('[data-wact]');
+    if (!b) return select(id);
+    const w = byId(id); if (!w) return;
+    if (b.dataset.wact === 'del') {
+      if (!confirm(`「${w.name}」を削除しますか?`)) return;
+      S.widgets = S.widgets.filter(x => x.id !== id);
+      if (selId === id) selId = S.widgets[0] ? S.widgets[0].id : null;
+      buildWList(); buildWed(); renderAll(); save();
+    } else if (S.widgets.length < 12) {
+      const c = JSON.parse(JSON.stringify(w)); c.id = uid(); c.name = (w.name + ' のコピー').slice(0, 30);
+      c.x = clamp(w.x + 24, 0, W - 40); c.y = clamp(w.y + 24, 0, H - 24);
+      S.widgets.push(c); select(c.id, true); renderAll(); save();
+    }
+  });
+
+  /* ----- 選択 ----- */
+  function showTab(n) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === n));
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + n));
+  }
+  function select(id, force) {
+    if (id === selId && !force) return;
+    selId = id;
+    boxes.forEach((b, i) => b.classList.toggle('sel', i === id));
+    drawGame(); buildWList();
+    if (id !== 'game') buildWed();
+    if (id === 'game') showTab('layout'); else showTab('parts');
+  }
+
+  /* ----- 部品の設定画面 ----- */
+  const numF = (f, label, v) => `<div><label>${label}</label><input type="number" data-f="${f}" value="${v}"></div>`;
+  function taskItemsHTML(w) {
+    const items = w.props.items;
+    let h = `<div class="row" style="margin-top:16px"><h2 style="margin:0;flex:1">項目(上から順に1つずつ表示)</h2><div class="seg"><button data-act="tmode" data-val="list" class="${tmode === 'list' ? 'on' : ''}">リスト</button><button data-act="tmode" data-val="text" class="${tmode === 'text' ? 'on' : ''}">テキスト</button></div></div>`;
+    if (tmode === 'text') {
+      return h + `<p class="help" style="margin-top:8px"><code>1. 項目名</code> が項目、<code>- </code>で始まる行がサブタスク、<code>&gt; </code>で始まる行がメモ(複数行OK)。<code>1. 項目名 | メモ</code> のように1行でもOK。</p><textarea id="txt" rows="16" spellcheck="false">${esc(toText(items))}</textarea>`;
+    }
+    const L = taskLocate(items, w.state.p);
+    h += '<div id="titems" style="margin-top:10px">' + items.map((it, i) => `
+      <div class="icard${i === L.ti ? ' on' : ''}" data-i="${i}">
+        <div class="irow"><span class="num">${i + 1}</span>
+          <input data-k="text" value="${esc(it.text)}" placeholder="項目名">
+          <button class="mini" data-act="tcur" title="この項目から始める">▶</button>
+          <button class="mini" data-act="tup">↑</button><button class="mini" data-act="tdown">↓</button><button class="mini" data-act="tdel">✕</button>
+        </div>
+        <textarea data-k="note" rows="${Math.max(1, it.note.split('\n').length)}" placeholder="メモ(任意。項目名の下に表示)">${esc(it.note)}</textarea>
+        ${it.subs.map((t, j) => `<div class="subrow" data-j="${j}"><input data-k="sub" value="${esc(t)}" placeholder="サブタスク"><button class="mini" data-act="tdelsub">✕</button></div>`).join('')}
+        <div><button class="btn sm" data-act="taddsub">＋ サブタスク</button></div>
+      </div>`).join('') + '</div><button class="btn wide" data-act="taddi">＋ 項目を追加</button>';
+    return h;
+  }
+  function listItemsHTML(w) {
+    return '<div id="litems" style="margin-top:10px">' + w.props.items.map((it, i) => `
+      <div class="icard" data-i="${i}">
+        <div class="irow"><span class="num">${i + 1}</span><input data-k="text" value="${esc(it.text)}" placeholder="名前"><button class="mini" data-act="lup">↑</button><button class="mini" data-act="ldown">↓</button><button class="mini" data-act="ldel">✕</button></div>
+        <div class="irow">
+          <select data-k="mode"><option value="count"${it.mode === 'count' ? ' selected' : ''}>個数(0/5など)</option><option value="check"${it.mode === 'check' ? ' selected' : ''}>チェック</option></select>
+          ${it.mode === 'count' ? `<label>目標<input type="number" min="0" data-k="need" value="${it.need}"></label>` : ''}
+          <label>今<input type="number" min="0" data-k="have" value="${w.state.vals[i] || 0}"></label>
+        </div>
+      </div>`).join('') + '</div><button class="btn wide" data-act="ladd">＋ 項目を追加</button>' +
+      `<details><summary>まとめて追加(貼り付け)</summary><p class="help">1行1項目。<code>名前 x5</code> で個数(目標5)、<code>名前</code> だけならチェック、<code>名前 x0</code> は目標なしのカウンターになります。</p><textarea id="lbulk" rows="5" placeholder="Salewa x2&#10;ライター x3&#10;地図"></textarea><button class="btn wide" data-act="lbulkadd" style="margin-top:8px">追加する</button></details>
+       <div style="margin-top:10px"><button class="btn sm" data-act="lreset">今の個数をすべて0に戻す</button></div>`;
+  }
+  function gridItemsHTML(w) {
+    return '<div id="litems" style="margin-top:10px">' + w.props.items.map((it, i) => `
+      <div class="icard" data-i="${i}">
+        <div class="irow"><span class="num">${i + 1}</span>${it.img ? `<img src="${esc(it.img)}" alt="" style="width:34px;height:34px;object-fit:contain;background:#0006;border-radius:4px">` : ''}<input data-k="text" value="${esc(it.text)}" placeholder="名前"><button class="mini" data-act="lup">↑</button><button class="mini" data-act="ldown">↓</button><button class="mini" data-act="ldel">✕</button></div>
+        <div class="irow">
+          <select data-k="mode"><option value="count"${it.mode === 'count' ? ' selected' : ''}>個数(0/5など)</option><option value="check"${it.mode === 'check' ? ' selected' : ''}>チェック</option></select>
+          ${it.mode === 'count' ? `<label>目標<input type="number" min="0" data-k="need" value="${it.need}"></label>` : ''}
+          <label>今<input type="number" min="0" data-k="have" value="${w.state.vals[i] || 0}"></label>
+        </div>
+        <div class="irow"><label class="btn sm" style="cursor:pointer">画像を選ぶ<input type="file" accept="image/*" data-up="item" hidden></label>${it.img ? '<button class="btn sm" data-act="gclrimg">画像を外す</button>' : '<span class="help">ここに画像をドラッグしてもOK</span>'}</div>
+      </div>`).join('') + `</div><button class="btn wide" data-act="ladd">＋ 項目を追加</button>
+      <div style="margin-top:10px"><label class="btn wide" style="cursor:pointer;text-align:center">画像をまとめて追加(ファイル名が名前になります)<input type="file" accept="image/*" multiple data-up="bulk" hidden></label></div>
+      <div style="margin-top:10px"><button class="btn sm" data-act="lreset">今の個数をすべて0に戻す</button></div>`;
+  }
+  const chk = (lab, attr, on) => `<label class="chk"><input type="checkbox" ${attr}${on ? ' checked' : ''}>${lab}</label>`;
+  const seg = (attr, val, opts) => `<div class="seg">${opts.map(([v, l]) => `<button ${attr} data-val="${v}" class="${val === v ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+  function buildWed() {
+    const w = cur(), el = $('wed');
+    if (!w) { el.innerHTML = '<p class="help" style="margin-top:14px">部品を選ぶか、追加してください。</p>'; return; }
+    const p = w.props;
+    let h = `<div class="sec"><h2>${esc(TYPE_NAMES[w.type])}の設定</h2>
+      <label class="f">名前(自分用の呼び名)</label><input data-f="name" value="${esc(w.name)}" maxlength="30">
+      <label class="f">位置と大きさ(OBSでの数字になります)</label>
+      <div class="g4">${numF('x', 'X', w.x)}${numF('y', 'Y', w.y)}${numF('w', '幅', w.w)}${numF('h', '高さ', w.h)}</div>
+      ${w.type === 'task' || w.type === 'list' || w.type === 'grid' ? '<div style="margin-top:8px"><button class="btn sm" data-act="autoh">高さを内容に合わせる</button></div>' : ''}
+      <div id="overmsg"></div>
+      ${chk('外枠のパネルをつける(背景と飾り線)', 'data-f="panel"', w.panel)}
+      <div class="slider">文字の大きさ<b data-out="scale"></b><input type="range" min="50" max="200" step="5" data-f="scale" value="${w.scale}"></div>
+      <label class="f">余白</label>
+      <select data-f="density"><option value="tight"${w.density === 'tight' ? ' selected' : ''}>ぎゅっと</option><option value="normal"${w.density === 'normal' ? ' selected' : ''}>標準</option><option value="loose"${w.density === 'loose' ? ' selected' : ''}>ゆったり</option></select>
+    </div>`;
+    if (w.type === 'task') {
+      h += `<div class="sec"><div class="row" style="flex-wrap:wrap"><button class="btn" data-act="tprev">◀ 戻る</button><span class="tcnt" id="tcnt"></span><button class="btn pri" data-act="tnext">進む ▶</button><button class="btn" data-act="treset">最初から</button></div>
+      <p class="help" style="margin:8px 0 0">進む(→キー)でサブタスクを1つずつ消化し、全部終わると次の項目に切り替わります。</p></div>
+      <div class="sec"><h2>表示のしかた</h2>
+        <div class="row"><span class="help" style="flex:1">形</span>${seg('data-act="tlayout"', p.layout, [['card', 'カード'], ['bar', '横長']])}</div>
+        ${chk('上に小さなラベルを表示する', 'data-pp="showLabel"', p.showLabel)}
+        <input data-pp="label" value="${esc(p.label)}" placeholder="ラベルの文字" style="margin-top:6px">
+        ${chk('項目の番号(例: 2 / 4)を表示する', 'data-pp="showCount"', p.showCount)}
+        ${p.layout === 'card' ? `<label class="f">見出し(空なら非表示。カード型のみ)</label><input data-pp="title" value="${esc(p.title)}">${chk('見出しに下線を引く', 'data-pp="underline"', p.underline)}` : ''}
+        ${chk('これから先のサブタスクを暗くする', 'data-pp="dim"', p.dim)}
+        ${chk('下に進捗バーを表示', 'data-pp="bar"', p.bar)}
+        ${chk('項目が終わったとき「TASK COMPLETE」を出す', 'data-pp="flash"', p.flash)}
+        <div class="slider">完了表示から次に切り替わるまで<b data-out="hold"></b><input type="range" min="400" max="3000" step="100" data-pp="hold" value="${p.hold}"></div>
+      </div>
+      <div class="sec">${taskItemsHTML(w)}</div>`;
+    } else if (w.type === 'list') {
+      h += `<div class="sec"><label class="f" style="margin-top:0">タイトル(空なら非表示)</label><input data-pp="title" value="${esc(p.title)}">
+        <p class="help" style="margin:8px 0 0">配信画面では、項目をクリックで+1(チェックは切り替え)、右クリックまたはShift+クリックで−1です。プレビューの上でも同じように試せます。</p>
+        <h2 style="margin-top:16px">項目</h2>${listItemsHTML(w)}</div>`;
+    } else if (w.type === 'grid') {
+      h += `<div class="sec"><label class="f" style="margin-top:0">タイトル(空なら非表示)</label><input data-pp="title" value="${esc(p.title)}">
+        <div class="row" style="margin-top:10px"><span class="help" style="flex:1">横に並べる数</span>${seg('data-act="gcols"', String(p.cols), [['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']])}</div>
+        ${chk('画像の下に名前を出す', 'data-pp="names"', p.names)}
+        <p class="help" style="margin:8px 0 0">配信画面で画像をクリックすると、光の線がスッと走って+1されます。目標まで集まると色がつき、枠が光ります(右クリック/Shift+クリックで−1)。画像がない項目は、名前の文字で表示されます。</p>
+        <h2 style="margin-top:16px">アイテム</h2>${gridItemsHTML(w)}</div>`;
+    } else if (w.type === 'image') {
+      h += `<div class="sec"><div class="row"><label class="btn" style="cursor:pointer">画像を選ぶ<input type="file" accept="image/*" data-up="part" hidden></label>${p.src ? '<button class="btn" data-act="iclr">外す</button>' : ''}</div>
+        ${p.src ? `<img src="${esc(p.src)}" alt="" style="max-width:100%;max-height:120px;margin-top:10px;background:#0006;border-radius:6px">` : '<p class="help">ロゴやスタンプなど、好きな画像を置けます(PNGの透明も使えます)。ここにドラッグしてもOK。</p>'}
+        <label class="f">枠からの内側の余白(px)</label><input type="number" min="0" max="60" data-pp="pad" value="${p.pad}">
+        <div class="row" style="margin-top:10px"><span class="help" style="flex:1">はめ方</span>${seg('data-act="ifit"', p.fit, [['contain', '全体を見せる'], ['cover', '枠いっぱい']])}</div></div>`;
+    } else if (w.type === 'plant') {
+      h += `<div class="sec"><div class="row" style="flex-wrap:wrap"><button class="btn pri" data-act="pwater">💧 水やり +1</button><button class="btn" data-act="punwater">−1</button><button class="btn" data-act="preset">最初から</button></div>
+        <p class="help" id="plinfo" style="margin:8px 0 0">${esc(plInfo(w))}</p>
+        <p class="help">配信画面では、木をクリックすると水やり(+1)、右クリックで−1です。プレビューの上でも試せます。</p></div>
+        <div class="sec"><h2>見た目</h2>
+        <label class="f" style="margin-top:0">種類</label><select data-pp="species">${Object.keys(PAL).map(k => `<option value="${k}"${p.species === k ? ' selected' : ''}>${PAL[k].name}</option>`).join('')}</select>
+        <label class="f">種(文字を変えると木の形が変わります)</label><input data-pp="seed" value="${esc(p.seed)}" maxlength="20">
+        <div class="slider">ドットの大きさ<b data-out="ps"></b><input type="range" min="2" max="8" step="1" data-pp="ps" value="${p.ps}"></div>
+        <label class="f">空</label><select data-pp="sky">${[['auto', '時刻に合わせる'], ['day', '昼'], ['sunset', '夕方'], ['night', '夜'], ['none', 'なし(透明)']].map(([v, l]) => `<option value="${v}"${p.sky === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="sec"><h2>育ち方</h2>
+        <label class="f" style="margin-top:0">満開までの水やり回数</label><input type="number" min="3" max="500" data-pp="steps" value="${p.steps}">
+        <label class="f">放っておいても育つ間隔(分。0なら自動では育たない)</label><input type="number" min="0" max="240" data-pp="auto" value="${p.auto}"><p class="help" style="margin:4px 0 0">※自動で育つのは、「書き出し」のリンクを開いた画面(OBS)でだけです。この編集画面のプレビューは動きません。設定を変えたら、リンクを貼り直してください。</p>
+        ${chk('デコレーションと動物を増やす(花・柵・うさぎ・きつねなど)', 'data-pp="decor"', p.decor)}
+        ${chk('育ち切ったあとは季節がめぐる(春→夏→秋→冬→春…)', 'data-pp="seasons"', p.seasons)}
+        <label class="f">季節が1つ進む水やり回数</label><input type="number" min="1" max="99" data-pp="seasonLen" value="${p.seasonLen}">
+        <label class="f">枠からの内側の余白(px。枠の飾り線を見せたいときは4〜8)</label><input type="number" min="0" max="60" data-pp="pad" value="${p.pad}">
+        <label class="f">季節が切り替わる演出の長さ(秒。0なら一瞬で切り替わる)</label><input type="number" min="0" max="60" data-pp="fade" value="${p.fade}"></div>`;
+    } else if (w.type === 'clock') {
+      h += `<div class="sec"><label class="f" style="margin-top:0">上に出す小さな文字(任意)</label><input data-pp="label" value="${esc(p.label)}">
+        <label class="f">表示</label><select data-pp="format"><option value="24"${p.format === '24' ? ' selected' : ''}>24時間</option><option value="12"${p.format === '12' ? ' selected' : ''}>12時間(AM/PM)</option></select>
+        ${chk('秒も表示する', 'data-pp="seconds"', p.seconds)}${chk('日付も表示する', 'data-pp="date"', p.date)}</div>`;
+    } else {
+      h += `<div class="sec"><label class="f" style="margin-top:0">小さなラベル(任意)</label><input data-pp="label" value="${esc(p.label)}">
+        <label class="f">文字</label><textarea data-pp="text" rows="4">${esc(p.text)}</textarea>
+        <div class="row" style="margin-top:10px"><span class="help" style="flex:1">そろえ</span>${seg('data-act="talign"', p.align, [['left', '左'], ['center', '中央'], ['right', '右']])}</div>
+        <div class="slider">文字のサイズ<b data-out="size"></b><input type="range" min="10" max="120" step="1" data-pp="size" value="${p.size}"></div>
+        ${chk('太字にする', 'data-pp="bold"', p.bold)}</div>`;
+    }
+    el.innerHTML = h;
+    syncOuts(); updateTaskCnt(); updateOverMsg();
+  }
+  function syncOuts() {
+    const w = cur(); if (!w) return;
+    const m = { scale: w.scale + '%', hold: ((w.props.hold || 0) / 1000).toFixed(1) + '秒', size: (w.props.size || 0) + 'px', ps: (w.props.ps || 0) + 'px' };
+    document.querySelectorAll('#wed [data-out]').forEach(e => e.textContent = m[e.dataset.out]);
+  }
+  function updateTaskCnt() {
+    const w = cur(), el = $('tcnt'); if (!w || w.type !== 'task' || !el) return;
+    const items = w.props.items, T = items.length, L = taskLocate(items, w.state.p);
+    let t = T === 0 ? '項目なし' : L.ti >= T ? '完了' : `${L.ti + 1} / ${T}`;
+    if (T && L.ti < T && items[L.ti].subs.length) t += `(サブ ${L.si + 1}/${items[L.ti].subs.length})`;
+    el.textContent = t;
+    document.querySelectorAll('#titems .icard').forEach((c, i) => c.classList.toggle('on', i === L.ti));
+  }
+  function setPosT(w, ti, si) {
+    const items = w.props.items;
+    w.state.p = ti >= items.length ? taskTotal(items) : taskStart(items, ti) + clamp(si, 0, steps(items[ti]) - 1);
+  }
+  function syncGeo() {
+    const w = cur(); if (!w) return;
+    ['x', 'y', 'w', 'h'].forEach(f => { const i = document.querySelector(`#wed [data-f="${f}"]`); if (i && document.activeElement !== i) i.value = w[f]; });
+  }
+
+  /* ----- 設定画面の入力 ----- */
+  $('wed').addEventListener('input', e => {
+    const t = e.target, w = cur(); if (!w) return;
+    const val = t.type === 'checkbox' ? t.checked : t.value;
+    if (t.dataset.f) {
+      const f = t.dataset.f;
+      if (['x', 'y', 'w', 'h'].includes(f)) { if (t.value === '') return; w[f] = Math.round(num(t.value, w[f], f === 'x' || f === 'y' ? 0 : (f === 'w' ? 40 : 24), f === 'x' || f === 'w' ? W : H)); }
+      else if (f === 'scale') w.scale = num(t.value, 100, 50, 200);
+      else if (f === 'name') { w.name = String(val).slice(0, 30); buildWListText(); }
+      else w[f] = val;
+      syncOuts(); touch(w); return;
+    }
+    if (t.dataset.pp) {
+      const f = t.dataset.pp;
+      w.props[f] = (t.type === 'range' || t.type === 'number') ? +t.value : val;
+      syncOuts(); touch(w); return;
+    }
+    if (t.id === 'txt') {
+      const L = taskLocate(w.props.items, w.state.p);
+      w.props.items = parseText(t.value); setPosT(w, L.ti, L.si); touch(w); updateTaskCnt(); return;
+    }
+    const kk = t.dataset.k; if (!kk) return;
+    const card = t.closest('[data-i]'); if (!card) return;
+    const i = +card.dataset.i;
+    if (w.type === 'task') {
+      const it = w.props.items[i]; if (!it) return;
+      if (kk === 'sub') it.subs[+t.closest('[data-j]').dataset.j] = t.value; else it[kk] = t.value;
+      if (kk === 'note') t.rows = Math.max(1, t.value.split('\n').length);
+      touch(w);
+    } else if (w.type === 'list' || w.type === 'grid') {
+      const it = w.props.items[i]; if (!it) return;
+      if (kk === 'text') it.text = t.value;
+      else if (kk === 'need') it.need = Math.round(num(t.value, 0, 0, 9999));
+      else if (kk === 'have') { const v = Math.round(num(t.value, 0, 0, 99999)); w.state.vals[i] = it.mode === 'check' ? Math.min(1, v) : v; }
+      else if (kk === 'mode') { it.mode = t.value; if (it.mode === 'check') w.state.vals[i] = Math.min(1, w.state.vals[i] || 0); touch(w); buildWed(); return; }
+      touch(w);
+    }
+  });
+  function buildWListText() { document.querySelectorAll('#wlist .wrow').forEach(r => { const w = byId(r.dataset.id); if (w) r.querySelector('.wn').textContent = w.name; }); }
+
+  $('wed').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'), w = cur(); if (!b || !w) return;
+    const a = b.dataset.act, card = b.closest('[data-i]'), i = card ? +card.dataset.i : -1;
+    if (a === 'tnext') return getRT(w).advance();
+    if (a === 'tprev') return getRT(w).back();
+    if (a === 'treset') return getRT(w).reset();
+    if (a === 'tmode') { tmode = b.dataset.val; return buildWed(); }
+    if (a === 'tlayout') { w.props.layout = b.dataset.val; touch(w); return buildWed(); }
+    if (a === 'talign') { w.props.align = b.dataset.val; touch(w); return buildWed(); }
+    if (a === 'pwater') { waterPlant(w, 1); touch(w); return buildWed(); }
+    if (a === 'punwater') { waterPlant(w, -1); touch(w); return buildWed(); }
+    if (a === 'preset') { PLV.delete(w.id); w.state.g = 0; w.state.rev = (w.state.rev | 0) + 1; plFx(w.id).length = 0; touch(w); return buildWed(); }
+    if (a === 'gcols') { w.props.cols = +b.dataset.val; touch(w); return buildWed(); }
+    if (a === 'ifit') { w.props.fit = b.dataset.val; touch(w); return buildWed(); }
+    if (a === 'iclr') { w.props.src = ''; touch(w); return buildWed(); }
+    if (a === 'gclrimg') { const it = w.props.items[i]; if (it) { it.img = ''; touch(w); buildWed(); } return; }
+    if (a === 'autoh') { w.h = clamp(measure(w), 24, H); touch(w); syncGeo(); return; }
+    if (w.type === 'task') {
+      const items = w.props.items, L = taskLocate(items, w.state.p);
+      let nt = L.ti;
+      if (a === 'tcur') { setPosT(w, i, 0); touch(w); return updateTaskCnt(); }
+      if (a === 'taddi') { if (items.length >= 60) return; items.push({ text: '', note: '', subs: [] }); }
+      else if (a === 'tup' && i > 0) { [items[i - 1], items[i]] = [items[i], items[i - 1]]; nt = L.ti === i ? i - 1 : L.ti === i - 1 ? i : L.ti; }
+      else if (a === 'tdown' && i < items.length - 1) { [items[i + 1], items[i]] = [items[i], items[i + 1]]; nt = L.ti === i ? i + 1 : L.ti === i + 1 ? i : L.ti; }
+      else if (a === 'tdel') { items.splice(i, 1); nt = i < L.ti ? L.ti - 1 : L.ti; }
+      else if (a === 'taddsub') items[i].subs.push('');
+      else if (a === 'tdelsub') items[i].subs.splice(+b.closest('[data-j]').dataset.j, 1);
+      else return;
+      setPosT(w, nt, L.si); touch(w); buildWed();
+      if (a === 'taddi') { const ins = document.querySelectorAll('#titems input[data-k=text]'); ins[ins.length - 1].focus(); }
+      if (a === 'taddsub') { const ins = document.querySelectorAll(`#titems [data-i="${i}"] input[data-k=sub]`); ins[ins.length - 1].focus(); }
+    } else if (w.type === 'list' || w.type === 'grid') {
+      const items = w.props.items, vals = w.state.vals;
+      if (a === 'ladd') { if (items.length >= 40) return; items.push(w.type === 'grid' ? { text: '', img: '', mode: 'count', need: 1 } : { text: '', mode: 'count', need: 1 }); vals.push(0); }
+      else if (a === 'ldel') { items.splice(i, 1); vals.splice(i, 1); }
+      else if (a === 'lup' && i > 0) { [items[i - 1], items[i]] = [items[i], items[i - 1]]; [vals[i - 1], vals[i]] = [vals[i], vals[i - 1]]; }
+      else if (a === 'ldown' && i < items.length - 1) { [items[i + 1], items[i]] = [items[i], items[i + 1]]; [vals[i + 1], vals[i]] = [vals[i], vals[i + 1]]; }
+      else if (a === 'lreset') w.state.vals = items.map(() => 0);
+      else if (a === 'lbulkadd') {
+        let n = 0;
+        for (const raw of $('lbulk').value.split(/\r?\n/)) {
+          const line = raw.trim(); if (!line || items.length >= 40) continue;
+          const m = line.match(/^(.*?)\s*[x×＊*]\s*(\d+)$/i);
+          if (m && m[1]) items.push({ text: m[1], mode: 'count', need: +m[2] }); else items.push({ text: line, mode: 'check', need: 0 });
+          vals.push(0); n++;
+        }
+        $('lbulk').value = ''; toast(`${n}件追加しました`);
+      } else return;
+      touch(w); buildWed();
+      if (a === 'ladd') { const ins = document.querySelectorAll('#litems input[data-k=text]'); ins[ins.length - 1].focus(); }
+    }
+  });
+
+  /* ----- 画像の取り込み(縮小して埋め込む) ----- */
+  function readImg(file, max) {
+    return new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onerror = rej;
+      fr.onload = () => {
+        const im = new Image();
+        im.onerror = rej;
+        im.onload = () => {
+          const r = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(im.width * r)); c.height = Math.max(1, Math.round(im.height * r));
+          c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          res(c.toDataURL('image/webp', .88));
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  async function applyFiles(files, kind, idx) {
+    const w = cur(); if (!w) return;
+    files = Array.from(files).filter(f => /^image\//.test(f.type));
+    if (!files.length) return toast('画像ファイルを選んでください');
+    try {
+      if (kind === 'part' && w.type === 'image') w.props.src = await readImg(files[0], 640);
+      else if (w.type === 'grid') {
+        if (kind === 'item' && w.props.items[idx]) {
+          w.props.items[idx].img = await readImg(files[0], 128);
+          if (!w.props.items[idx].text) w.props.items[idx].text = files[0].name.replace(/\.[^.]+$/, '');
+        } else {
+          for (const f of files) {
+            if (w.props.items.length >= 40) { toast('アイテムは40個までです'); break; }
+            w.props.items.push({ text: f.name.replace(/\.[^.]+$/, ''), img: await readImg(f, 128), mode: 'count', need: 1 }); w.state.vals.push(0);
+          }
+        }
+      } else return;
+      touch(w); buildWed();
+    } catch (err) { toast('画像を読み込めませんでした'); }
+  }
+  $('wed').addEventListener('change', e => {
+    const t = e.target; if (t.type !== 'file' || !t.dataset.up) return;
+    const card = t.closest('[data-i]');
+    applyFiles(t.files, t.dataset.up, card ? +card.dataset.i : -1); t.value = '';
+  });
+  $('wed').addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault(); });
+  $('wed').addEventListener('drop', e => {
+    if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    const w = cur(); if (!w) return;
+    const card = e.target.closest('[data-i]');
+    applyFiles(e.dataTransfer.files, w.type === 'image' ? 'part' : card && e.dataTransfer.files.length === 1 ? 'item' : 'bulk', card ? +card.dataset.i : -1);
+  });
+
+  /* 内容に合わせた高さを測る */
+  function measure(w) {
+    const probe = document.createElement('div');
+    probe.style.cssText = `position:absolute;left:-99999px;top:0;width:${w.w}px;visibility:hidden`;
+    const el = document.createElement('div'); probe.appendChild(el); document.body.appendChild(probe);
+    applyWidgetBox(el, w, S.theme); el.style.height = 'auto';
+    let m = 0;
+    if (w.type === 'task') {
+      const items = w.props.items;
+      for (let i = 0; i <= items.length; i++) { el.innerHTML = taskHTML(Object.assign({}, w, { state: { p: taskStart(items, i) } }), null, false); m = Math.max(m, el.offsetHeight); }
+      if (w.props.layout === 'bar') m += 2;
+    } else { el.innerHTML = widgetInner(w, null, false); m = el.offsetHeight; }
+    document.body.removeChild(probe);
+    return Math.ceil(m);
+  }
+
+  /* ----- 配置・デザイン ----- */
+  function updateGinfo() {
+    $('ginfo').innerHTML = `高さ ${gh()} ／ ゲームキャプチャの拡大率 <b>${(S.game.w / W * 100).toFixed(1)}%</b>(1920×1080の画面を縮めて置く場合)`;
+  }
+  function syncGameInputs() { document.querySelectorAll('[data-g]').forEach(i => { if (document.activeElement !== i) i.value = S.game[i.dataset.g]; }); }
+  document.querySelectorAll('[data-g]').forEach(i => i.addEventListener('input', () => {
+    if (i.value === '') return;
+    const f = i.dataset.g; S.game[f] = Math.round(num(i.value, S.game[f], f === 'w' ? 320 : 0, f === 'w' || f === 'x' ? W : H));
+    drawFrame(fctx, S); drawGame(); updateGinfo(); updateOuts(); save();
+  }));
+  document.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => {
+    if (S.widgets.length && !confirm('今ある部品が、テンプレートの部品に入れ替わります。よろしいですか?')) return;
+    const t = template(b.dataset.tpl);
+    S.game = t.game; S.widgets = t.widgets; selId = S.widgets[0] ? S.widgets[0].id : null;
+    boxes.forEach(x => x.remove()); boxes.clear(); rts.clear();
+    buildWList(); buildWed(); renderAll(); save();
+  });
+  function syncTheme() {
+    document.querySelectorAll('[data-th]').forEach(e => { e.value = S.theme[e.dataset.th]; });
+    document.querySelectorAll('[data-thout]').forEach(e => e.textContent = S.theme[e.dataset.thout] + '%');
+  }
+  document.querySelectorAll('[data-th]').forEach(e => e.addEventListener('input', () => {
+    S.theme[e.dataset.th] = e.type === 'range' ? +e.value : e.value; syncTheme(); renderAll(); save();
+  }));
+  document.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => { Object.assign(S.theme, THEMES[b.dataset.theme]); syncTheme(); renderAll(); save(); });
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => showTab(t.dataset.tab));
+
+  /* ----- プレビュー上の操作(ドラッグ・クリック) ----- */
+  function fitCv() {
+    const bw = $('cvbox').clientWidth; if (!bw) return;
+    k = bw / W; $('cv').style.transform = `scale(${k})`; $('cvbox').style.height = (H * k) + 'px';
+  }
+  $('cv').addEventListener('pointerdown', e => {
+    const box = e.target.closest('.wbox, .gbox'); if (!box) return;
+    const id = box.dataset.id; if (e.button !== 0) return;
+    select(id);
+    const isGame = id === 'game', w = isGame ? null : byId(id);
+    drag = { id, mode: e.target.closest('.rh') ? 'resize' : 'move', sx: e.clientX, sy: e.clientY, moved: false,
+      o: isGame ? { x: S.game.x, y: S.game.y, w: S.game.w } : { x: w.x, y: w.y, w: w.w, h: w.h } };
+  });
+  document.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = (e.clientX - drag.sx) / k, dy = (e.clientY - drag.sy) / k;
+    if (!drag.moved && Math.hypot(dx, dy) * k < 4) return;
+    drag.moved = true;
+    if (drag.id === 'game') {
+      if (drag.mode === 'move') { S.game.x = clamp(Math.round(drag.o.x + dx), 0, W - 40); S.game.y = clamp(Math.round(drag.o.y + dy), 0, H - 40); }
+      else S.game.w = clamp(Math.round(drag.o.w + dx), 320, W);
+      drawFrame(fctx, S); drawGame(); updateGinfo(); syncGameInputs();
+    } else {
+      const w = byId(drag.id); if (!w) return;
+      if (drag.mode === 'move') { w.x = clamp(Math.round(drag.o.x + dx), 0, W - w.w); w.y = clamp(Math.round(drag.o.y + dy), 0, H - w.h); }
+      else { w.w = clamp(Math.round(drag.o.w + dx), 40, W - w.x); w.h = clamp(Math.round(drag.o.h + dy), 24, H - w.y); }
+      renderWidget(w); drawFrame(fctx, S); syncGeo();
+    }
+  });
+  document.addEventListener('pointerup', () => {
+    if (drag && drag.moved) { suppress = true; setTimeout(() => suppress = false, 0); save(); updateOuts(); }
+    drag = null;
+  });
+  $('cv').addEventListener('click', e => { if (suppress) { e.stopPropagation(); e.preventDefault(); } }, true);
+  function listAct(e, dir) {
+    const pl = e.target.closest('.pl');
+    if (pl) {
+      const box = pl.closest('.wbox'), w = box && byId(box.dataset.id);
+      if (w && w.type === 'plant') { e.preventDefault(); waterPlant(w, dir); renderWidget(w); save(); const inf = $('plinfo'); if (inf && selId === w.id) inf.textContent = plInfo(w); updateOuts(); }
+      return;
+    }
+    const li = e.target.closest('.li, .gt'); if (!li) return;
+    const box = li.closest('.wbox'), w = box && byId(box.dataset.id); if (!w || (w.type !== 'list' && w.type !== 'grid')) return;
+    e.preventDefault();
+    if (listClick(w, +li.dataset.i, dir)) { if (dir > 0 && w.type === 'grid') setFx(w.id, +li.dataset.i); renderWidget(w); save(); const h = document.querySelector(`#litems [data-i="${li.dataset.i}"] input[data-k=have]`); if (h) h.value = w.state.vals[+li.dataset.i]; }
+  }
+  $('cv').addEventListener('click', e => listAct(e, e.shiftKey ? -1 : 1));
+  $('cv').addEventListener('contextmenu', e => listAct(e, -1));
+  document.addEventListener('keydown', e => {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '')) return;
+    const w = cur() && cur().type === 'task' ? cur() : S.widgets.find(x => x.type === 'task'); if (!w) return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); getRT(w).advance(); } else if (e.key === 'ArrowLeft') { e.preventDefault(); getRT(w).back(); }
+  });
+
+  /* ----- 書き出し ----- */
+  const base = () => location.href.split('#')[0];
+  const partCfg = w => ({ id: w.id, type: w.type, name: w.name, x: w.x, y: w.y, w: w.w, h: w.h, panel: w.panel, scale: w.scale, density: w.density, props: w.props });
+  const RM = () => S.remote || (S.remote = { on: false, port: 4580 });
+  const linkW = w => base() + '#w=' + enc({ v: 3, rp: RM().on ? RM().port : 0, theme: S.theme, w: partCfg(w), st: w.state });
+  const linkF = () => base() + '#f=' + enc({ v: 3, theme: S.theme, game: S.game, rects: S.widgets.filter(x => x.panel).map(x => ({ x: x.x, y: x.y, w: x.w, h: x.h })) });
+  function linkNote(w) {
+    if (w.type !== 'grid' && w.type !== 'image') return '';
+    const n = Math.round(linkW(w).length / 1024);
+    return ` ／ リンク ${n}KB` + (n > 400 ? '<b style="color:#ff8a7a"> (長すぎます。画像を減らしてください)</b>' : '');
+  }
+  function updateOuts() {
+    let h = `<div class="outrow"><div class="on1"><b>ゲームキャプチャ</b><span>拡大率 ${(S.game.w / W * 100).toFixed(1)}% ／ サイズ ${S.game.w} × ${gh()} ／ 位置 (${S.game.x}, ${S.game.y})</span></div></div>`;
+    h += `<div class="outrow"><div class="on1"><b>外枠</b><span>サイズ 1920 × 1080 ／ 位置 (0, 0) ／ ゲーム画面の部分は透明</span></div><button class="btn sm" data-copy="f">リンク</button><button class="btn sm" data-open="f">開く</button><button class="btn sm" data-png="1">PNG</button></div>`;
+    h += S.widgets.map(w => `<div class="outrow"><div class="on1"><b>${esc(w.name)}</b><span>${esc(TYPE_NAMES[w.type])} ／ サイズ ${w.w} × ${w.h} ／ 位置 (${w.x}, ${w.y})${linkNote(w)}</span></div><button class="btn sm or" data-copy="${esc(w.id)}">リンクをコピー</button><button class="btn sm" data-open="${esc(w.id)}">開く</button></div>`).join('');
+    $('outs').innerHTML = h;
+    renderRemote();
+  }
+  function renderRemote() {
+    const r = RM(), on = $('rm-on'), po = $('rm-port');
+    if (on && document.activeElement !== on) on.checked = r.on;
+    if (po && document.activeElement !== po) po.value = r.port;
+    const url = p => `http://127.0.0.1:${r.port}/cmd/${p}`, row = (lab, p) => `<div class="outrow"><div class="on1"><b>${esc(lab)}</b><span>${esc(url(p))}</span></div><button class="btn sm or" data-rcopy="${esc(url(p))}">URLをコピー</button></div>`;
+    let h = '';
+    if (S.widgets.some(x => x.type === 'plant')) h += row('水やり (+1)', 'water') + row('水やりを1つ戻す', 'unwater');
+    if (S.widgets.some(x => x.type === 'task')) h += row('タスクを進める', 'next') + row('タスクを戻す', 'prev');
+    S.widgets.filter(x => x.type === 'list' || x.type === 'grid').forEach(w => {
+      const q = '?part=' + encodeURIComponent(w.name);
+      w.props.items.slice(0, 40).forEach((it, i) => { h += row(`${w.name}:${it.text || i + 1} +1`, 'item/' + (i + 1) + q) + row(`${w.name}:${it.text || i + 1} −1`, 'item/' + (i + 1) + '/minus' + q); });
+    });
+    $('rm-cmds').innerHTML = h || '<p class="help">水やり・タスク・探しものの部品を追加すると、ここにボタン用のURLが出ます。</p>';
+  }
+  $('rm-on').onchange = e => { RM().on = e.target.checked; save(); updateOuts(); toast(RM().on ? 'オンにしました。部品のリンクをコピーし直して、OBSに貼り直してください' : 'オフにしました。リンクを貼り直すと反映されます'); };
+  $('rm-port').oninput = e => { if (e.target.value === '') return; RM().port = Math.round(num(e.target.value, 4580, 1024, 65535)); save(); renderRemote(); };
+  $('rm-cmds').addEventListener('click', async e => {
+    const b = e.target.closest('[data-rcopy]'); if (!b) return;
+    let ok = false;
+    try { await navigator.clipboard.writeText(b.dataset.rcopy); ok = true; } catch (err) { try { const ta = document.createElement('textarea'); ta.value = b.dataset.rcopy; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (_) {} }
+    toast(ok ? 'URLをコピーしました' : 'コピーできませんでした');
+  });
+  $('rm-dl').onclick = () => download(new Blob([$('relay-src').textContent.replace(/^\n/, '')], { type: 'text/javascript' }), 'overlay-relay.js');
+  $('rm-bat').onclick = () => download(new Blob(['@echo off\r\ncd /d "%~dp0"\r\nnode overlay-relay.js\r\npause\r\n'], { type: 'text/plain' }), 'start-overlay-relay.bat');
+  const linkFor = id => id === 'f' ? linkF() : (byId(id) ? linkW(byId(id)) : '');
+  $('outs').addEventListener('click', async e => {
+    const c = e.target.closest('[data-copy]'), o = e.target.closest('[data-open]'), p = e.target.closest('[data-png]');
+    if (c) {
+      const link = linkFor(c.dataset.copy); let ok = false;
+      try { await navigator.clipboard.writeText(link); ok = true; } catch (err) {
+        try { const ta = document.createElement('textarea'); ta.value = link; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (_) {}
+      }
+      toast(ok ? 'リンクをコピーしました' : 'コピーできませんでした。もう一度お試しください');
+    } else if (o) window.open(linkFor(o.dataset.open), '_blank');
+    else if (p) {
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      drawFrame(cv.getContext('2d'), S);
+      cv.toBlob(b => { if (b) { download(b, 'overlay-frame.png'); toast('外枠のPNGを書き出しました'); } }, 'image/png');
+    }
+  });
+  const download = (blob, name) => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  $('save-json').onclick = () => download(new Blob([JSON.stringify(S, null, 2)], { type: 'application/json' }), 'overlay-maker.json');
+  $('load-json').onclick = () => $('file').click();
+  $('file').onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        S = normalize(JSON.parse(r.result)); selId = S.widgets[0] ? S.widgets[0].id : null;
+        boxes.forEach(x => x.remove()); boxes.clear(); rts.clear();
+        syncTheme(); buildWList(); buildWed(); renderAll(); save(); toast('読み込みました');
+      } catch (err) { toast('読み込めませんでした(形式が違います)'); }
+    };
+    r.readAsText(f); e.target.value = '';
+  };
+
+  /* ----- 起動 ----- */
+  if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fitCv)).observe($('cvbox'));
+  window.addEventListener('resize', fitCv);
+  window.addEventListener('hashchange', () => location.reload());
+  setInterval(() => tickClocks($('cv')), 1000);
+  syncTheme(); buildWList(); buildWed(); fitCv(); renderAll();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => renderAll());
+}
+
+/* ---------- 起動 ---------- */
+const m = location.hash.match(/^#([wf])=(.+)$/);
+if (m) viewInit(m[1], m[2]); else editorInit();
+})();
+</script>
+</body>
+</html>
