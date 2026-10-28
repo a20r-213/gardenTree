@@ -4,6 +4,7 @@
    ・じょうろに水がたまる(実際の時間。アプリを閉じていてもたまる)
    ・水をかけると、少し早く育つ
    ・木を触ると、花びらが舞う
+   ・メモを書くと、1日1回、水が1杯たまる
    木を描くのは tree-art.js の仕事です。ここでは「いま何段階めか」を渡すだけ。
    ============================================================ */
 
@@ -14,6 +15,7 @@ const CONFIG = {
   WATER_STEPS: 1,        // 水を1杯かけると、進む段階の数(1段階 = 4時間ぶん)
   WATER_MAX: 3,          // じょうろにためておける水の数
   WATER_REGEN_HOURS: 3,  // 水が1杯たまるまでの時間(時間)
+  MEMO_WATER: 1,         // メモを書いたとき(1日1回)もらえる水の数
   SEED_FIRST: 'roza'     // 最初の木の「種」(文字を変えると木の形が変わります)
 };
 
@@ -239,10 +241,133 @@ $id('reset').addEventListener('click', () => {
   if (!confirm('いまの木を片づけて、新しい種を植えますか?')) return;
   const seed = 's' + Math.random().toString(36).slice(2, 7); // ランダムな種 → 毎回ちがう形の木になる
   SAVE = newSave(seed); TREE.props.seed = seed; PLV.delete(TREE.id); plFx(TREE.id).length = 0;
-  lastUnlock = -1; lastBloomed = null; persist();
+  lastUnlock = -1; lastBloomed = null; persist(); closeSheets();
 });
 
-/* ---------- 開発用パネル(アドレスの最後に #debug を付けると出ます) ---------- */
+/* ============================================================
+   ドット絵のアイコン(文字で描いた絵を、色に置きかえて表示します)
+   ============================================================ */
+const ICON_PAL = { o: '#4a2a1c', y: '#f0b84a', Y: '#c98a2a', p: '#e88a9a', K: '#3a2a2a', w: '#fff3dc', r: '#c4574a', R: '#8e3a30', g: '#9aa0aa', G: '#6a707a' };
+const ICONS = {
+  // えんぴつ
+  note: [
+    '........oo..',
+    '.......oppo.',
+    '......oyyoo.',
+    '.....oyYyo..',
+    '....oyYyo...',
+    '...oyYyo....',
+    '..oyYyo.....',
+    '.oyYyo......',
+    '.oowYo......',
+    '.oKKo.......',
+    '.oo.........',
+    '............'
+  ],
+  // 本
+  book: [
+    '............',
+    '.oooooooooo.',
+    'orrrrorrrrro',
+    'orwwworwwwro',
+    'orwwworwwwro',
+    'orwwworwwwro',
+    'orwwworwwwro',
+    'orwwworwwwro',
+    'orrrrorrrrro',
+    '.oRRRoRRRRo.',
+    '..oooooooo..',
+    '............'
+  ],
+  // 歯車
+  gear: [
+    '.....oo.....',
+    '..oo.oo.oo..',
+    '..ogoggogo..',
+    '...oggggo...',
+    '.oogGooGgoo.',
+    'ooggGooGggoo',
+    'ooggGooGggoo',
+    '.oogGooGgoo.',
+    '...oggggo...',
+    '..ogoggogo..',
+    '..oo.oo.oo..',
+    '.....oo.....'
+  ]
+};
+function drawIcons() {
+  document.querySelectorAll('canvas.ico').forEach(cv => {
+    const rows = ICONS[cv.dataset.ico]; if (!rows) return;
+    const c = cv.getContext('2d'); c.clearRect(0, 0, cv.width, cv.height);
+    rows.forEach((row, y) => [...row].forEach((ch, x) => { if (ch !== '.' && ICON_PAL[ch]) { c.fillStyle = ICON_PAL[ch]; c.fillRect(x, y, 1, 1); } }));
+  });
+}
+
+/* ============================================================
+   シート(メモ・き録・設定の小窓)
+   ============================================================ */
+function openSheet(id) { $id(id).hidden = false; }
+function closeSheets() { document.querySelectorAll('.overlay').forEach(o => { o.hidden = true; }); }
+document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', closeSheets));
+document.querySelectorAll('.overlay').forEach(o => o.addEventListener('pointerdown', e => { if (e.target === o) closeSheets(); })); // 外側をタッチで閉じる
+
+/* ============================================================
+   メモ(任意。書くと、1日1回だけ水がもらえる)
+   ============================================================ */
+const MEMO_KEY = 'treegame_memos_v1';
+function loadMemos() {
+  try {
+    const o = JSON.parse(localStorage.getItem(MEMO_KEY));
+    if (o && Array.isArray(o.list)) return { list: o.list.filter(m => m && typeof m.text === 'string' && Number.isFinite(m.t)).slice(0, 300), rewardDay: typeof o.rewardDay === 'string' ? o.rewardDay : '' };
+  } catch (e) {}
+  return { list: [], rewardDay: '' };
+}
+let MEMOS = loadMemos();
+function persistMemos() { try { localStorage.setItem(MEMO_KEY, JSON.stringify(MEMOS)); } catch (e) {} }
+const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+// 今日のごほうびがもらえるか?(もらい済み・水が満タン・満開のときはもらえない)
+function memoRewardState(now) {
+  if (MEMOS.rewardDay === dayKey(now)) return 'done';
+  if (growthAt(now) >= CONFIG.STEPS) return 'bloomed';
+  if (stockAt(now) >= CONFIG.WATER_MAX) return 'full';
+  return 'ok';
+}
+function openMemo() {
+  const st = memoRewardState(Date.now());
+  $id('memo-hint').textContent = st === 'ok' ? '書くと、今日は水が1杯たまるよ。書かなくてもOK!'
+    : st === 'done' ? '今日のごほうびはもらったよ。何度書いてもOK!'
+    : st === 'full' ? '水が満タンだから、使ってからまた書いてね(メモは残るよ)'
+    : '満開になったから、ゆっくり書いてね';
+  openSheet('sheet-memo');
+}
+function saveMemo() {
+  const ta = $id('memo-text'), text = ta.value.trim().slice(0, 500);
+  if (!text) { ta.focus(); return; }
+  const now = Date.now(), st = memoRewardState(now);
+  MEMOS.list.unshift({ t: now, text: text }); MEMOS.list = MEMOS.list.slice(0, 300);
+  let msg = 'メモを書いたよ';
+  if (st === 'ok') {
+    SAVE.stock = Math.min(CONFIG.WATER_MAX, stockAt(now) + CONFIG.MEMO_WATER); SAVE.waterAt = now; // 水が増える(ここから数え直し)
+    MEMOS.rewardDay = dayKey(now); persist(); msg = '水が1杯たまった!';
+  }
+  persistMemos(); ta.value = ''; closeSheets(); showMsg(msg);
+}
+function renderLog() {
+  const box = $id('log-list'); box.textContent = '';
+  if (!MEMOS.list.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = 'まだメモがないよ。「メモ」から書いてみよう'; box.appendChild(p); return; }
+  const z = n => String(n).padStart(2, '0');
+  MEMOS.list.forEach(m => {
+    const d = new Date(m.t), item = document.createElement('div'), small = document.createElement('small'), body = document.createElement('div');
+    item.className = 'log-item'; small.textContent = `${d.getMonth() + 1}/${d.getDate()} ${z(d.getHours())}:${z(d.getMinutes())}`; body.textContent = m.text;
+    item.appendChild(small); item.appendChild(body); box.appendChild(item);
+  });
+}
+$id('open-memo').addEventListener('click', openMemo);
+$id('memo-save').addEventListener('click', saveMemo);
+$id('open-log').addEventListener('click', () => { renderLog(); openSheet('sheet-log'); });
+$id('open-settings').addEventListener('click', () => openSheet('sheet-settings'));
+
+/* ---------- 開発用パネル(アドレスの最後に #debug を付けると、設定の中に出ます) ---------- */
 function setupDebug() {
   const box = $id('debug'); box.hidden = location.hash !== '#debug';
   window.addEventListener('hashchange', () => { box.hidden = location.hash !== '#debug'; });
@@ -255,6 +380,7 @@ function setupDebug() {
 /* ---------- 起動 ---------- */
 window.addEventListener('resize', resizeStage);
 setupDebug();
+drawIcons();
 resizeStage();
-window.__game = { SAVE: () => SAVE, TREE, pour, growthAt, stockAt, CONFIG }; // テスト用
+window.__game = { SAVE: () => SAVE, MEMOS: () => MEMOS, TREE, pour, growthAt, stockAt, CONFIG }; // テスト用
 frame();

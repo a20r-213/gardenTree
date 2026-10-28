@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#14101c">
+<meta name="theme-color" content="#4a2a1c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="育つ木">
 <title>育つ木</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,40 +13,80 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main id="app">
-  <header>
-    <div class="row-between">
-      <span id="title">育つ木</span>
-      <span id="prog-label"></span>
-    </div>
-    <div id="prog"><i id="prog-fill"></i></div>
-  </header>
+<div id="app">
 
+  <!-- 景色(全画面)。木の絵と、触ったときの演出の2枚を重ねています -->
   <div id="stage">
     <canvas id="tree"></canvas>
     <canvas id="fx"></canvas>
     <div id="msg"></div>
   </div>
 
-  <section id="water">
-    <button id="can-btn" aria-label="じょうろで水をやる"><canvas id="can" width="22" height="18"></canvas></button>
-    <div id="wtext">
+  <!-- 上:育ち具合と設定 -->
+  <header id="hud">
+    <div class="panel" id="hud-main">
+      <div class="row-between"><span id="title">育つ木</span><span id="prog-label"></span></div>
+      <div id="prog"><i id="prog-fill"></i></div>
+    </div>
+    <button class="panel sq small" id="open-settings" aria-label="設定"><canvas class="ico" data-ico="gear" width="12" height="12"></canvas></button>
+  </header>
+
+  <!-- 右:メモとき録 -->
+  <nav id="side">
+    <button class="panel sq" id="open-memo"><canvas class="ico" data-ico="note" width="12" height="12"></canvas><span>メモ</span></button>
+    <button class="panel sq" id="open-log"><canvas class="ico" data-ico="book" width="12" height="12"></canvas><span>き録</span></button>
+  </nav>
+
+  <!-- 下:じょうろ -->
+  <footer id="bar">
+    <button class="panel" id="can-btn" aria-label="じょうろで水をやる"><canvas id="can" width="22" height="18"></canvas></button>
+    <div class="panel" id="wtext">
       <div id="pips"><i></i><i></i><i></i></div>
       <div id="wbar"><i id="wbar-fill"></i></div>
       <div id="wlabel"></div>
     </div>
-  </section>
+  </footer>
 
-  <button id="reset" class="link">植え直す</button>
-
-  <div id="debug" hidden>
-    <b>デバッグ</b>
-    <button data-adv="4">+4時間</button>
-    <button data-adv="24">+1日</button>
-    <button data-adv="72">+3日</button>
-    <button id="dbg-water">水を満タン</button>
+  <!-- メモを書く -->
+  <div class="overlay" id="sheet-memo" hidden>
+    <div class="panel sheet">
+      <h2>きょうのメモ</h2>
+      <p class="note" id="memo-hint"></p>
+      <textarea id="memo-text" rows="5" maxlength="500" placeholder="今日やったこと、思ったこと、なんでもOK"></textarea>
+      <div class="actions">
+        <button class="btn" data-close>とじる</button>
+        <button class="btn pri" id="memo-save">書く</button>
+      </div>
+    </div>
   </div>
-</main>
+
+  <!-- メモの一覧 -->
+  <div class="overlay" id="sheet-log" hidden>
+    <div class="panel sheet">
+      <h2>き録</h2>
+      <div id="log-list"></div>
+      <div class="actions"><button class="btn" data-close>とじる</button></div>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div class="overlay" id="sheet-settings" hidden>
+    <div class="panel sheet">
+      <h2>設定</h2>
+      <p class="note">いまの木を片づけて、新しい種を植えます。メモは残ります。</p>
+      <div class="actions"><button class="btn" id="reset">植え直す</button></div>
+      <div id="debug" hidden>
+        <b>デバッグ</b>
+        <button class="btn sm" data-adv="4">+4時間</button>
+        <button class="btn sm" data-adv="24">+1日</button>
+        <button class="btn sm" data-adv="72">+3日</button>
+        <button class="btn sm" id="dbg-water">水を満タン</button>
+      </div>
+      <div class="actions"><button class="btn" data-close>とじる</button></div>
+    </div>
+  </div>
+
+</div>
 
 <!-- 木の絵(基本さわらない) → ゲームのしくみ(ここをよく直す) の順に読み込みます -->
 <script src="tree-art.js"></script>
