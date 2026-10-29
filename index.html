@@ -15,57 +15,92 @@
 <body>
 <div id="app">
 
-  <!-- 景色(全画面)。木の絵と、触ったときの演出の2枚を重ねています -->
-  <div id="stage">
-    <canvas id="tree"></canvas>
-    <canvas id="fx"></canvas>
-    <div id="msg"></div>
+  <!-- 3つの画面が横にならんでいます。指で左右にスワイプすると切り替わります(左:ずかん / 中:そだてる / 右:ジオラマ) -->
+  <div id="pager">
+
+    <!-- 左:ずかん(いまは中身が空っぽ。あとで作ります) -->
+    <section class="page page-soon" id="page-dex">
+      <div class="panel soon">
+        <h2>ずかん</h2>
+        <p class="note">じゅんび中です。<br>育ち切った木が、ここに並びます。</p>
+      </div>
+    </section>
+
+    <!-- 中:そだてる(いままでのメイン画面) -->
+    <section class="page" id="page-grow">
+
+      <!-- 景色(全画面)。木の絵と、触ったときの演出の2枚を重ねています -->
+      <div id="stage">
+        <canvas id="tree"></canvas>
+        <canvas id="fx"></canvas>
+        <div id="msg"></div>
+      </div>
+
+      <!-- 上:育ち具合・どんぐり・設定 -->
+      <header id="hud">
+        <div class="panel" id="hud-main">
+          <span id="prog-label"></span>
+          <div id="prog"><i id="prog-fill"></i></div>
+        </div>
+        <div class="panel" id="acorn-box" aria-label="どんぐり"><canvas class="ico" data-ico="acorn" width="12" height="12"></canvas><span id="acorn-n">0</span></div>
+        <button class="panel sq small" id="open-settings" aria-label="設定"><canvas class="ico" data-ico="gear" width="12" height="12"></canvas></button>
+      </header>
+
+      <!-- 右:メモ(き録も、メモの小窓の中にあります) -->
+      <nav id="side">
+        <button class="panel sq" id="open-memo"><canvas class="ico" data-ico="note" width="12" height="12"></canvas><span>メモ</span></button>
+      </nav>
+
+      <!-- 下:じょうろ -->
+      <footer id="bar">
+        <button class="panel" id="can-btn" aria-label="じょうろで水をやる"><canvas id="can" width="22" height="18"></canvas></button>
+        <div class="panel" id="wtext">
+          <div id="pips"><i></i><i></i><i></i></div>
+          <div id="wbar"><i id="wbar-fill"></i></div>
+          <div id="wlabel"></div>
+        </div>
+      </footer>
+
+    </section>
+
+    <!-- 右:ジオラマ(いまは中身が空っぽ。あとで作ります) -->
+    <section class="page page-soon" id="page-diorama">
+      <div class="panel soon">
+        <h2>ジオラマ</h2>
+        <p class="note">じゅんび中です。<br>育てた木を、好きな飾りで<br>ながめられるようになります。</p>
+      </div>
+    </section>
+
   </div>
 
-  <!-- 上:育ち具合と設定 -->
-  <header id="hud">
-    <div class="panel" id="hud-main">
-      <div class="row-between"><span id="title">育つ木</span><span id="prog-label"></span></div>
-      <div id="prog"><i id="prog-fill"></i></div>
-    </div>
-    <button class="panel sq small" id="open-settings" aria-label="設定"><canvas class="ico" data-ico="gear" width="12" height="12"></canvas></button>
-  </header>
-
-  <!-- 右:メモとき録 -->
-  <nav id="side">
-    <button class="panel sq" id="open-memo"><canvas class="ico" data-ico="note" width="12" height="12"></canvas><span>メモ</span></button>
-    <button class="panel sq" id="open-log"><canvas class="ico" data-ico="book" width="12" height="12"></canvas><span>き録</span></button>
+  <!-- 画面の上の小さな点(いまどの画面か。タップでも移動できます) -->
+  <nav id="dots">
+    <button data-page="0" aria-label="ずかん"></button>
+    <button data-page="1" aria-label="そだてる"></button>
+    <button data-page="2" aria-label="ジオラマ"></button>
   </nav>
 
-  <!-- 下:じょうろ -->
-  <footer id="bar">
-    <button class="panel" id="can-btn" aria-label="じょうろで水をやる"><canvas id="can" width="22" height="18"></canvas></button>
-    <div class="panel" id="wtext">
-      <div id="pips"><i></i><i></i><i></i></div>
-      <div id="wbar"><i id="wbar-fill"></i></div>
-      <div id="wlabel"></div>
-    </div>
-  </footer>
-
-  <!-- メモを書く -->
+  <!-- メモ(「書く」と「き録」を、1つの小窓の中で切り替えます) -->
   <div class="overlay" id="sheet-memo" hidden>
     <div class="panel sheet">
-      <h2>きょうのメモ</h2>
-      <p class="note" id="memo-hint"></p>
-      <textarea id="memo-text" rows="5" maxlength="500" placeholder="今日やったこと、思ったこと、なんでもOK"></textarea>
-      <div class="actions">
-        <button class="btn" data-close>とじる</button>
-        <button class="btn pri" id="memo-save">書く</button>
+      <div class="tabs">
+        <button class="tab on" data-tab="write">書く</button>
+        <button class="tab" data-tab="read">き録</button>
       </div>
-    </div>
-  </div>
 
-  <!-- メモの一覧 -->
-  <div class="overlay" id="sheet-log" hidden>
-    <div class="panel sheet">
-      <h2>き録</h2>
-      <div id="log-list"></div>
-      <div class="actions"><button class="btn" data-close>とじる</button></div>
+      <div class="pane" id="pane-write">
+        <p class="note" id="memo-hint"></p>
+        <textarea id="memo-text" rows="5" maxlength="500" placeholder="今日やったこと、思ったこと、なんでもOK"></textarea>
+        <div class="actions">
+          <button class="btn" data-close>とじる</button>
+          <button class="btn pri" id="memo-save">書く</button>
+        </div>
+      </div>
+
+      <div class="pane" id="pane-read" hidden>
+        <div id="log-list"></div>
+        <div class="actions"><button class="btn" data-close>とじる</button></div>
+      </div>
     </div>
   </div>
 
@@ -73,14 +108,16 @@
   <div class="overlay" id="sheet-settings" hidden>
     <div class="panel sheet">
       <h2>設定</h2>
-      <p class="note">いまの木を片づけて、新しい種を植えます。メモは残ります。</p>
-      <div class="actions"><button class="btn" id="reset">植え直す</button></div>
+      <p class="note">ここには、あとから音やデータの設定が入ります。</p>
+      <!-- 開発用(アドレスの最後に #debug を付けたときだけ出ます) -->
       <div id="debug" hidden>
         <b>デバッグ</b>
         <button class="btn sm" data-adv="4">+4時間</button>
         <button class="btn sm" data-adv="24">+1日</button>
         <button class="btn sm" data-adv="72">+3日</button>
         <button class="btn sm" id="dbg-water">水を満タン</button>
+        <button class="btn sm" id="dbg-acorn">どんぐり+10</button>
+        <button class="btn sm" id="reset">木を植え直す</button>
       </div>
       <div class="actions"><button class="btn" data-close>とじる</button></div>
     </div>

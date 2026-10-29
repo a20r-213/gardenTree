@@ -4,7 +4,8 @@
    ・じょうろに水がたまる(実際の時間。アプリを閉じていてもたまる)
    ・水をかけると、少し早く育つ
    ・木を触ると、花びらが舞う
-   ・メモを書くと、1日1回、水が1杯たまる
+   ・メモを書くと、1日1回、どんぐりがもらえる
+   ・画面は3つ。横にスワイプして切り替える(左:ずかん / 中:そだてる / 右:ジオラマ)
    木を描くのは tree-art.js の仕事です。ここでは「いま何段階めか」を渡すだけ。
    ============================================================ */
 
@@ -15,49 +16,86 @@ const CONFIG = {
   WATER_STEPS: 1,        // 水を1杯かけると、進む段階の数(1段階 = 4時間ぶん)
   WATER_MAX: 3,          // じょうろにためておける水の数
   WATER_REGEN_HOURS: 3,  // 水が1杯たまるまでの時間(時間)
-  MEMO_WATER: 1,         // メモを書いたとき(1日1回)もらえる水の数
+  MEMO_ACORNS: 3,        // メモを書いたとき(1日1回)もらえるどんぐりの数
+  GACHA_COST: 5,         // ガチャ1回に必要などんぐりの数(ガチャは、まだ作っていません)
   SEED_FIRST: 'roza'     // 最初の木の「種」(文字を変えると木の形が変わります)
 };
 
-/* ---------- 保存データ(スマホ・ブラウザの中に残ります) ---------- */
-const SAVE_KEY = 'treegame_v1';
+/* ============================================================
+   保存データ(スマホ・ブラウザの中に残ります)
+   まるごと1つの箱 DATA に入れて、'treegame_v2' という名前で保存します。
+     DATA.tree    : いま育てている木(植えた時刻・水・種)
+     DATA.placed  : 木のまわりに置いた装飾(まだ空。あとで使います)
+     DATA.owned   : 持っている装飾(まだ空。あとで使います)
+     DATA.acorns  : どんぐりの数
+     DATA.dex     : ずかんに登録した木(まだ空。あとで使います)
+     DATA.memos   : メモの一覧と、ごほうびをもらった日
+   ============================================================ */
+const SAVE_KEY = 'treegame_v2';
+const OLD_SAVE_KEY = 'treegame_v1';        // 前のバージョンの木のデータ(引き継ぎ用)
+const OLD_MEMO_KEY = 'treegame_memos_v1';  // 前のバージョンのメモのデータ(引き継ぎ用)
 const STEP_MS = CONFIG.STEP_HOURS * 3600 * 1000;
 const REGEN_MS = CONFIG.WATER_REGEN_HOURS * 3600 * 1000;
 
-function newSave(seed) {
+// 新しい木のデータ。start: 植えた時刻 / bonus: 水やりで進んだ段階 / stock: 水の数 / waterAt: stockを数えはじめた時刻
+function newTree(seed) {
   const now = Date.now();
-  // start: 植えた時刻 / bonus: 水やりで進んだ段階 / stock: 水の数 / waterAt: stockを数えはじめた時刻
   return { start: now, bonus: 0, stock: CONFIG.WATER_MAX, waterAt: now, seed: seed };
 }
-function loadSave() {
-  try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && Number.isFinite(s.start)) {
-      return {
-        start: s.start,
-        bonus: Math.max(0, Number(s.bonus) || 0),
-        stock: Math.min(CONFIG.WATER_MAX, Math.max(0, Number(s.stock) || 0)),
-        waterAt: Number.isFinite(s.waterAt) ? s.waterAt : Date.now(),
-        seed: typeof s.seed === 'string' ? s.seed.slice(0, 20) : CONFIG.SEED_FIRST
-      };
-    }
-  } catch (e) {}
-  return newSave(CONFIG.SEED_FIRST);
+// 木のデータが壊れていないか確かめて、きれいな形にそろえる(ダメなら null)
+function cleanTree(s) {
+  if (!s || !Number.isFinite(s.start)) return null;
+  return {
+    start: s.start,
+    bonus: Math.max(0, Number(s.bonus) || 0),
+    stock: Math.min(CONFIG.WATER_MAX, Math.max(0, Number(s.stock) || 0)),
+    waterAt: Number.isFinite(s.waterAt) ? s.waterAt : Date.now(),
+    seed: typeof s.seed === 'string' ? s.seed.slice(0, 20) : CONFIG.SEED_FIRST
+  };
 }
-let SAVE = loadSave();
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); } catch (e) {} }
+function cleanMemoList(list) {
+  return Array.isArray(list) ? list.filter(m => m && typeof m.text === 'string' && Number.isFinite(m.t)).slice(0, 300) : [];
+}
+function freshData() {
+  return { v: 2, tree: newTree(CONFIG.SEED_FIRST), placed: [], owned: [], acorns: 0, dex: [], memos: { list: [], rewardDay: '' } };
+}
+function readJSON(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
+
+function loadData() {
+  const d = freshData();
+  const cur = readJSON(SAVE_KEY);
+  if (cur && cur.v === 2) {
+    // 新しい形のデータがあれば、それを使う
+    d.tree = cleanTree(cur.tree) || d.tree;
+    d.placed = Array.isArray(cur.placed) ? cur.placed : [];
+    d.owned = Array.isArray(cur.owned) ? cur.owned : [];
+    d.acorns = Math.max(0, Math.floor(Number(cur.acorns) || 0));
+    d.dex = Array.isArray(cur.dex) ? cur.dex : [];
+    if (cur.memos) d.memos = { list: cleanMemoList(cur.memos.list), rewardDay: typeof cur.memos.rewardDay === 'string' ? cur.memos.rewardDay : '' };
+    return d;
+  }
+  // 新しい形がなければ、前のバージョンのデータを引き継ぐ(木とメモ。古いデータは消さずに残します)
+  d.tree = cleanTree(readJSON(OLD_SAVE_KEY)) || d.tree;
+  const oldMemos = readJSON(OLD_MEMO_KEY);
+  if (oldMemos) d.memos.list = cleanMemoList(oldMemos.list); // ごほうびの日は引き継がない → 今日からどんぐりがもらえる
+  return d;
+}
+const DATA = loadData();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(DATA)); } catch (e) {} }
+persist(); // 引き継ぎをしたときに、すぐ新しい形で保存しておく
 
 /* ---------- いまの成長・水の数を、時刻から計算する ---------- */
 // 成長 = (植えてからの時間 ÷ 1段階の時間) + 水やりで進んだぶん。満開(STEPS)で止まる
-const growthAt = now => Math.min(CONFIG.STEPS, Math.max(0, (now - SAVE.start) / STEP_MS) + SAVE.bonus);
+const growthAt = now => Math.min(CONFIG.STEPS, Math.max(0, (now - DATA.tree.start) / STEP_MS) + DATA.tree.bonus);
 // 水の数 = 保存した数 + 時間でたまったぶん。WATER_MAXで止まる
-const stockAt = now => SAVE.stock >= CONFIG.WATER_MAX ? CONFIG.WATER_MAX
-  : Math.min(CONFIG.WATER_MAX, SAVE.stock + Math.max(0, now - SAVE.waterAt) / REGEN_MS);
+const stockAt = now => DATA.tree.stock >= CONFIG.WATER_MAX ? CONFIG.WATER_MAX
+  : Math.min(CONFIG.WATER_MAX, DATA.tree.stock + Math.max(0, now - DATA.tree.waterAt) / REGEN_MS);
 
 /* ---------- 木(tree-art.js に渡すデータ) ---------- */
+// decor: false = 「育つにつれて、飾りや動物が自動で出てくる」しくみを止めています(絵のコードは tree-art.js に残っています)
 const TREE = {
   id: 'main',
-  props: { species: 'tree', seed: SAVE.seed, ps: 4, steps: CONFIG.STEPS, sky: 'auto', auto: 0, decor: true, seasons: false, seasonLen: 4, fade: 10, pad: 0 },
+  props: { species: 'tree', seed: DATA.tree.seed, ps: 4, steps: CONFIG.STEPS, sky: 'auto', auto: 0, decor: false, seasons: false, seasonLen: 4, fade: 10, pad: 0 },
   state: { g: 0 }
 };
 
@@ -77,11 +115,30 @@ function resizeStage() {
   particles.length = 0;
 }
 
-let msgTimer = 0;
 function showMsg(text) {
   const m = $id('msg'); m.textContent = text;
   m.classList.remove('show'); void m.offsetWidth; m.classList.add('show');
 }
+
+/* ============================================================
+   3つの画面(横スワイプ)
+   横にならんだ3枚の画面(#pager)を、スクロールで切り替えています。
+   0 = ずかん / 1 = そだてる / 2 = ジオラマ
+   ============================================================ */
+const pagerEl = $id('pager'), dotEls = Array.from(document.querySelectorAll('#dots button'));
+let pageIdx = 1;
+// 画面を切り替える。smooth = true だと、すーっと動く
+function goPage(i, smooth) {
+  pagerEl.scrollTo({ left: i * pagerEl.clientWidth, behavior: smooth ? 'smooth' : 'auto' });
+}
+// 今どの画面かを計算して、上の点の色を変える
+function updateDots() {
+  pageIdx = Math.round(pagerEl.scrollLeft / Math.max(1, pagerEl.clientWidth));
+  dotEls.forEach((el, i) => el.classList.toggle('on', i === pageIdx));
+}
+pagerEl.addEventListener('scroll', updateDots, { passive: true });
+dotEls.forEach(el => el.addEventListener('click', () => goPage(Number(el.dataset.page), true)));
+window.addEventListener('resize', () => goPage(pageIdx, false)); // 画面の幅が変わっても、いまの画面にとどまる
 
 /* ============================================================
    じょうろ(ドット絵)
@@ -145,8 +202,8 @@ function pour() {
   if (!bloomed) {
     const st = stockAt(now);
     if (st < 1) { canAnim = { t0: performance.now(), kind: 'no' }; showMsg('まだ たまってないよ'); return; }
-    SAVE.stock = st - 1; SAVE.waterAt = now;           // 水を1杯つかう(ここから次の1杯のカウントが始まる)
-    SAVE.bonus += CONFIG.WATER_STEPS;                  // そのぶん木が育つ
+    DATA.tree.stock = st - 1; DATA.tree.waterAt = now;   // 水を1杯つかう(ここから次の1杯のカウントが始まる)
+    DATA.tree.bonus += CONFIG.WATER_STEPS;               // そのぶん木が育つ
     persist();
   }
   canAnim = { t0: performance.now(), kind: 'pour' };
@@ -175,7 +232,8 @@ function onTap(e) {
   }
   particles.push({ spark: true, x: x, y: y, age: 0, life: 0.3 }); // タップした場所に小さなキラッ
 }
-fxCv.addEventListener('pointerdown', onTap);
+// 'click' = 指をちょんと触れて離したとき。スワイプ(指を動かして画面を切り替える)のときは反応しません
+fxCv.addEventListener('click', onTap);
 
 let lastFxT = 0;
 function drawFx(nowMs) {
@@ -207,6 +265,7 @@ function updateUI(now) {
   const g = growthAt(now), bloomed = g >= CONFIG.STEPS;
   $id('prog-fill').style.width = (g / CONFIG.STEPS * 100) + '%';
   $id('prog-label').textContent = bloomed ? '満開!' : `満開まで あと約${fmtDur((CONFIG.STEPS - g) * STEP_MS)}`;
+  $id('acorn-n').textContent = DATA.acorns;
   const st = stockAt(now), full = Math.floor(st + 1e-9);
   document.querySelectorAll('#pips i').forEach((el, i) => el.classList.toggle('on', i < full));
   const frac = st >= CONFIG.WATER_MAX ? 0 : st - Math.floor(st);
@@ -219,7 +278,7 @@ function updateUI(now) {
 /* ============================================================
    メインループ(1秒に60回くらい呼ばれる)
    ============================================================ */
-let lastUnlock = -1, lastBloomed = null, lastUiT = 0;
+let lastBloomed = null, lastUiT = 0;
 function frame() {
   const nowMs = performance.now(), now = Date.now();
   const g = growthAt(now);
@@ -227,27 +286,25 @@ function frame() {
   if (treeCtx) plantFrame(treeCtx, TREE, LW, LH);
   if (fxCtx) drawFx(nowMs);
   drawCan(nowMs);
-  // 新しいものが解放されたら、文字でお知らせ(起動直後は出さない)
-  const u = plUnl(TREE), bloomed = g >= CONFIG.STEPS;
-  if (lastUnlock >= 0 && u > lastUnlock) showMsg('NEW  ' + DECOR[u - 1]);
-  if (lastBloomed === false && bloomed) showMsg('満開!');
-  lastUnlock = u; lastBloomed = bloomed;
+  const bloomed = g >= CONFIG.STEPS;
+  if (lastBloomed === false && bloomed) showMsg('満開!'); // 起動直後は出さない
+  lastBloomed = bloomed;
   if (nowMs - lastUiT > 250) { lastUiT = nowMs; updateUI(now); }
   requestAnimationFrame(frame);
 }
 
-/* ---------- 「植え直す」(新しい種で、木をはじめから) ---------- */
+/* ---------- 「木を植え直す」(新しい種で、木をはじめから)。いまは開発用パネルの中だけにあります ---------- */
 $id('reset').addEventListener('click', () => {
   if (!confirm('いまの木を片づけて、新しい種を植えますか?')) return;
   const seed = 's' + Math.random().toString(36).slice(2, 7); // ランダムな種 → 毎回ちがう形の木になる
-  SAVE = newSave(seed); TREE.props.seed = seed; PLV.delete(TREE.id); plFx(TREE.id).length = 0;
-  lastUnlock = -1; lastBloomed = null; persist(); closeSheets();
+  DATA.tree = newTree(seed); TREE.props.seed = seed; PLV.delete(TREE.id); plFx(TREE.id).length = 0;
+  lastBloomed = null; persist(); closeSheets();
 });
 
 /* ============================================================
    ドット絵のアイコン(文字で描いた絵を、色に置きかえて表示します)
    ============================================================ */
-const ICON_PAL = { o: '#4a2a1c', y: '#f0b84a', Y: '#c98a2a', p: '#e88a9a', K: '#3a2a2a', w: '#fff3dc', r: '#c4574a', R: '#8e3a30', g: '#9aa0aa', G: '#6a707a' };
+const ICON_PAL = { o: '#4a2a1c', y: '#f0b84a', Y: '#c98a2a', p: '#e88a9a', K: '#3a2a2a', w: '#fff3dc', r: '#c4574a', R: '#8e3a30', g: '#9aa0aa', G: '#6a707a', B: '#7a4a2a', b: '#a8693a' };
 const ICONS = {
   // えんぴつ
   note: [
@@ -264,20 +321,20 @@ const ICONS = {
     '.oo.........',
     '............'
   ],
-  // 本
-  book: [
-    '............',
+  // どんぐり
+  acorn: [
+    '.....oo.....',
+    '...oooooo...',
+    '..oBbBbBBo..',
+    '.oBbBBBbBBo.',
+    '.oBBBBBBBBo.',
     '.oooooooooo.',
-    'orrrrorrrrro',
-    'orwwworwwwro',
-    'orwwworwwwro',
-    'orwwworwwwro',
-    'orwwworwwwro',
-    'orwwworwwwro',
-    'orrrrorrrrro',
-    '.oRRRoRRRRo.',
-    '..oooooooo..',
-    '............'
+    '.oyyyyyyyYo.',
+    '.oyyyyyyYYo.',
+    '..oyyyyYYo..',
+    '...oyyYYo...',
+    '....oYYo....',
+    '.....oo.....'
   ],
   // 歯車
   gear: [
@@ -304,7 +361,7 @@ function drawIcons() {
 }
 
 /* ============================================================
-   シート(メモ・き録・設定の小窓)
+   シート(メモ・設定の小窓)
    ============================================================ */
 function openSheet(id) { $id(id).hidden = false; }
 function closeSheets() { document.querySelectorAll('.overlay').forEach(o => { o.hidden = true; }); }
@@ -312,51 +369,43 @@ document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click
 document.querySelectorAll('.overlay').forEach(o => o.addEventListener('pointerdown', e => { if (e.target === o) closeSheets(); })); // 外側をタッチで閉じる
 
 /* ============================================================
-   メモ(任意。書くと、1日1回だけ水がもらえる)
+   メモ(任意。書くと、1日1回だけ どんぐり がもらえる)
+   メモの小窓には「書く」と「き録(読み返し)」の2つのタブがあります
    ============================================================ */
-const MEMO_KEY = 'treegame_memos_v1';
-function loadMemos() {
-  try {
-    const o = JSON.parse(localStorage.getItem(MEMO_KEY));
-    if (o && Array.isArray(o.list)) return { list: o.list.filter(m => m && typeof m.text === 'string' && Number.isFinite(m.t)).slice(0, 300), rewardDay: typeof o.rewardDay === 'string' ? o.rewardDay : '' };
-  } catch (e) {}
-  return { list: [], rewardDay: '' };
-}
-let MEMOS = loadMemos();
-function persistMemos() { try { localStorage.setItem(MEMO_KEY, JSON.stringify(MEMOS)); } catch (e) {} }
 const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
-// 今日のごほうびがもらえるか?(もらい済み・水が満タン・満開のときはもらえない)
-function memoRewardState(now) {
-  if (MEMOS.rewardDay === dayKey(now)) return 'done';
-  if (growthAt(now) >= CONFIG.STEPS) return 'bloomed';
-  if (stockAt(now) >= CONFIG.WATER_MAX) return 'full';
-  return 'ok';
+// 今日のごほうびは、もうもらったか?
+const memoRewarded = now => DATA.memos.rewardDay === dayKey(now);
+
+function showTab(name) {
+  document.querySelectorAll('#sheet-memo .tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
+  $id('pane-write').hidden = name !== 'write';
+  $id('pane-read').hidden = name !== 'read';
+  if (name === 'read') renderLog();
 }
 function openMemo() {
-  const st = memoRewardState(Date.now());
-  $id('memo-hint').textContent = st === 'ok' ? '書くと、今日は水が1杯たまるよ。書かなくてもOK!'
-    : st === 'done' ? '今日のごほうびはもらったよ。何度書いてもOK!'
-    : st === 'full' ? '水が満タンだから、使ってからまた書いてね(メモは残るよ)'
-    : '満開になったから、ゆっくり書いてね';
+  $id('memo-hint').textContent = memoRewarded(Date.now())
+    ? '今日のごほうびはもらったよ。何度書いてもOK!'
+    : `書くと、今日はどんぐりが${CONFIG.MEMO_ACORNS}個もらえるよ。書かなくてもOK!`;
+  showTab('write');
   openSheet('sheet-memo');
 }
 function saveMemo() {
   const ta = $id('memo-text'), text = ta.value.trim().slice(0, 500);
   if (!text) { ta.focus(); return; }
-  const now = Date.now(), st = memoRewardState(now);
-  MEMOS.list.unshift({ t: now, text: text }); MEMOS.list = MEMOS.list.slice(0, 300);
+  const now = Date.now(), first = !memoRewarded(now);
+  DATA.memos.list.unshift({ t: now, text: text }); DATA.memos.list = DATA.memos.list.slice(0, 300);
   let msg = 'メモを書いたよ';
-  if (st === 'ok') {
-    SAVE.stock = Math.min(CONFIG.WATER_MAX, stockAt(now) + CONFIG.MEMO_WATER); SAVE.waterAt = now; // 水が増える(ここから数え直し)
-    MEMOS.rewardDay = dayKey(now); persist(); msg = '水が1杯たまった!';
+  if (first) {
+    DATA.acorns += CONFIG.MEMO_ACORNS;
+    DATA.memos.rewardDay = dayKey(now); msg = `どんぐり +${CONFIG.MEMO_ACORNS}`;
   }
-  persistMemos(); ta.value = ''; closeSheets(); showMsg(msg);
+  persist(); ta.value = ''; closeSheets(); showMsg(msg);
 }
 function renderLog() {
   const box = $id('log-list'); box.textContent = '';
-  if (!MEMOS.list.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = 'まだメモがないよ。「メモ」から書いてみよう'; box.appendChild(p); return; }
+  if (!DATA.memos.list.length) { const p = document.createElement('p'); p.className = 'note'; p.textContent = 'まだメモがないよ。「書く」から書いてみよう'; box.appendChild(p); return; }
   const z = n => String(n).padStart(2, '0');
-  MEMOS.list.forEach(m => {
+  DATA.memos.list.forEach(m => {
     const d = new Date(m.t), item = document.createElement('div'), small = document.createElement('small'), body = document.createElement('div');
     item.className = 'log-item'; small.textContent = `${d.getMonth() + 1}/${d.getDate()} ${z(d.getHours())}:${z(d.getMinutes())}`; body.textContent = m.text;
     item.appendChild(small); item.appendChild(body); box.appendChild(item);
@@ -364,7 +413,7 @@ function renderLog() {
 }
 $id('open-memo').addEventListener('click', openMemo);
 $id('memo-save').addEventListener('click', saveMemo);
-$id('open-log').addEventListener('click', () => { renderLog(); openSheet('sheet-log'); });
+document.querySelectorAll('#sheet-memo .tab').forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
 $id('open-settings').addEventListener('click', () => openSheet('sheet-settings'));
 
 /* ---------- 開発用パネル(アドレスの最後に #debug を付けると、設定の中に出ます) ---------- */
@@ -372,9 +421,10 @@ function setupDebug() {
   const box = $id('debug'); box.hidden = location.hash !== '#debug';
   window.addEventListener('hashchange', () => { box.hidden = location.hash !== '#debug'; });
   box.querySelectorAll('[data-adv]').forEach(b => b.addEventListener('click', () => {
-    SAVE.start -= Number(b.dataset.adv) * 3600 * 1000; SAVE.waterAt -= Number(b.dataset.adv) * 3600 * 1000; persist();
+    DATA.tree.start -= Number(b.dataset.adv) * 3600 * 1000; DATA.tree.waterAt -= Number(b.dataset.adv) * 3600 * 1000; persist();
   }));
-  $id('dbg-water').addEventListener('click', () => { SAVE.stock = CONFIG.WATER_MAX; SAVE.waterAt = Date.now(); persist(); });
+  $id('dbg-water').addEventListener('click', () => { DATA.tree.stock = CONFIG.WATER_MAX; DATA.tree.waterAt = Date.now(); persist(); });
+  $id('dbg-acorn').addEventListener('click', () => { DATA.acorns += 10; persist(); });
 }
 
 /* ---------- 起動 ---------- */
@@ -382,5 +432,7 @@ window.addEventListener('resize', resizeStage);
 setupDebug();
 drawIcons();
 resizeStage();
-window.__game = { SAVE: () => SAVE, MEMOS: () => MEMOS, TREE, pour, growthAt, stockAt, CONFIG }; // テスト用
+goPage(1, false); // はじめは、まんなかの「そだてる」画面から
+updateDots();
+window.__game = { DATA, TREE, pour, growthAt, stockAt, CONFIG, goPage }; // テスト用
 frame();
